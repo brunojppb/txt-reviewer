@@ -116,6 +116,9 @@ function setFailed(row) {
  */
 export function refreshRows() {
   if (!state.sidebar || !state.editor) return
+  // A sidebar swap can drop the row a pointer sits over with no mouseout,
+  // so a stale preview would otherwise paint until the next hover.
+  clearPreview()
   state.sidebar.querySelectorAll('.annotation-edit').forEach((row) => {
     if (state.failed.has(row.dataset.editId)) {
       setFailed(row)
@@ -125,6 +128,15 @@ export function refreshRows() {
     const found = Boolean(findTarget(state.editor, annotationId, row.dataset.target))
     setDrifted(row, !found)
   })
+}
+
+const REFRESH_DELAY = 300
+let refreshTimer = 0
+
+/** Runs refreshRows after a short pause in typing, so undo and edits repaint. */
+export function scheduleRefreshRows() {
+  window.clearTimeout(refreshTimer)
+  refreshTimer = window.setTimeout(refreshRows, REFRESH_DELAY)
 }
 
 async function accept(row) {
@@ -151,6 +163,10 @@ async function accept(row) {
     const html = (await response.text()).trim()
     if (html) {
       card.outerHTML = html
+      // outerHTML drops the old node, so htmx never sees the new one on its
+      // own. Process it here or its hx-post buttons stay dead until a poll.
+      const fresh = state.sidebar.querySelector(`[data-annotation-id="${CSS.escape(annotationId)}"]`)
+      if (fresh) window.htmx?.process(fresh)
       refreshRows()
     } else {
       // No edit is left, so the server filed the finding. Removing the
@@ -230,6 +246,7 @@ export function mountEdits({ editor }) {
     sidebar.removeEventListener('mouseout', onOut)
     sidebar.removeEventListener('focusin', onOver)
     sidebar.removeEventListener('focusout', onOut)
+    window.clearTimeout(refreshTimer)
     state.editor = null
     state.sidebar = null
   }
