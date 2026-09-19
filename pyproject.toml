@@ -1,0 +1,20 @@
+[project]
+name = "txt-reviwer"
+version = "0.1.0"
+description = "A local web app for workshopping prose."
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.141.1",
+    "jinja2>=3.1.6",
+    "python-multipart>=0.0.32",
+    "uvicorn[standard]>=0.53.0",
+]
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+    "pytest>=9.1.1",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

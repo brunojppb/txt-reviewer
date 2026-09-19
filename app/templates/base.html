@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="en" class="h-full">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{% block title %}Workshop{% endblock %}</title>
+    <link rel="stylesheet" href="/static/css/app.css" />
+    <script src="/static/vendor/htmx.min.js" defer></script>
+    <script src="/static/js/app.js" defer></script>
+  </head>
+  <body class="h-full bg-stone-50 font-sans text-stone-900 antialiased">
+    {% block body %}{% endblock %}
+  </body>
+</html>

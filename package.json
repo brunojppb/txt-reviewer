@@ -1,0 +1,27 @@
+{
+  "name": "txt-reviwer",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Frontend assets for the writing workshop tool",
+  "scripts": {
+    "build:css": "tailwindcss -i assets/css/app.css -o app/static/css/app.css --minify",
+    "build:js": "esbuild assets/js/main.js --bundle --minify --outfile=app/static/js/app.js",
+    "build:vendor": "mkdir -p app/static/vendor && cp node_modules/htmx.org/dist/htmx.min.js app/static/vendor/htmx.min.js",
+    "build": "npm run build:css && npm run build:js && npm run build:vendor",
+    "watch": "npm run build:vendor && (tailwindcss -i assets/css/app.css -o app/static/css/app.css --watch & esbuild assets/js/main.js --bundle --outfile=app/static/js/app.js --watch)"
+  },
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.3.3",
+    "esbuild": "^0.28.2",
+    "tailwindcss": "^4.3.3"
+  },
+  "dependencies": {
+    "@tiptap/core": "^3.31.3",
+    "@tiptap/extension-bubble-menu": "^3.31.3",
+    "@tiptap/extension-placeholder": "^3.31.3",
+    "@tiptap/pm": "^3.31.3",
+    "@tiptap/starter-kit": "^3.31.3",
+    "htmx.org": "^2.0.10"
+  }
+}

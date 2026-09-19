@@ -1,0 +1,60 @@
+<form
+  class="mb-3 flex flex-col gap-2 rounded-lg border border-stone-200 bg-white p-3"
+  hx-post="/documents/{{ document_id }}/revisions"
+  hx-target="#revisions"
+  hx-swap="innerHTML"
+>
+  <input
+    type="text"
+    name="label"
+    placeholder="Label this snapshot"
+    class="w-full rounded border border-stone-200 px-2 py-1 text-sm outline-none focus:border-stone-400"
+  />
+  <label class="flex items-center gap-2 text-xs text-stone-600">
+    <input type="checkbox" name="is_major" value="1" /> Major
+  </label>
+  <button
+    type="submit"
+    class="rounded-md bg-stone-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-stone-700"
+  >
+    Snapshot
+  </button>
+</form>
+
+<ul class="divide-y divide-stone-200 rounded-lg border border-stone-200 bg-white">
+  {% for r in revisions %}
+    <li id="revision-{{ r.id }}" class="px-3 py-2 text-sm">
+      <div class="flex items-center gap-2">
+        <time class="text-xs text-stone-500">{{ r.created_at[:16] | replace("T", " ") }}</time>
+        {% if r.is_major %}
+          <span class="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800">MAJOR</span>
+        {% endif %}
+      </div>
+      <p class="truncate text-stone-700">{{ r.label or "No label" }}</p>
+      <div class="mt-1 flex items-center gap-3 text-xs">
+        <a href="/revisions/{{ r.id }}" class="text-stone-600 hover:underline">View</a>
+        <button
+          type="button"
+          class="text-stone-600 hover:underline"
+          hx-post="/revisions/{{ r.id }}/flag"
+          hx-vals='{"is_major": "{{ 0 if r.is_major else 1 }}", "label": {{ r.label | tojson }}}'
+          hx-target="#revisions"
+          hx-swap="innerHTML"
+        >
+          {{ "Unflag major" if r.is_major else "Flag major" }}
+        </button>
+        <button
+          type="button"
+          class="text-stone-600 hover:underline"
+          hx-post="/revisions/{{ r.id }}/restore"
+          hx-confirm="Restore this revision? The current text is snapshotted first."
+          hx-swap="none"
+        >
+          Restore
+        </button>
+      </div>
+    </li>
+  {% else %}
+    <li class="px-3 py-6 text-center text-xs text-stone-500">No revisions yet.</li>
+  {% endfor %}
+</ul>

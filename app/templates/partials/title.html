@@ -1,0 +1,11 @@
+<input
+  id="doc-title"
+  name="title"
+  value="{{ doc.title }}"
+  aria-label="Document title"
+  class="w-full min-w-0 border-none bg-transparent text-lg font-semibold tracking-tight outline-none focus:ring-0"
+  hx-post="/documents/{{ doc.id }}/title"
+  hx-trigger="change"
+  hx-target="this"
+  hx-swap="outerHTML"
+/>

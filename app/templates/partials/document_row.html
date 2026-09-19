@@ -1,0 +1,15 @@
+<li id="document-{{ doc.id }}" class="flex items-center justify-between gap-4 px-4 py-3">
+  <a href="/documents/{{ doc.id }}" class="min-w-0 flex-1 truncate font-medium hover:underline">
+    {{ doc.title }}
+  </a>
+  <time class="shrink-0 text-xs text-stone-500">{{ doc.updated_at[:16] | replace("T", " ") }}</time>
+  <button
+    type="button"
+    class="shrink-0 rounded-md px-2 py-1 text-xs text-stone-500 hover:bg-red-50 hover:text-red-700"
+    hx-delete="/documents/{{ doc.id }}"
+    hx-confirm="Delete “{{ doc.title }}”?"
+    hx-swap="none"
+  >
+    Delete
+  </button>
+</li>

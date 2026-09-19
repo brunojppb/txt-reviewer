@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}{{ doc.title }}{% endblock %}
+{% block body %}
+<header class="sticky top-0 z-10 border-b border-stone-200 bg-stone-50/90 backdrop-blur">
+  <div class="mx-auto flex max-w-6xl items-center gap-4 px-6 py-3">
+    <a href="/" class="shrink-0 text-sm text-stone-500 hover:underline">&larr; Documents</a>
+    <div class="min-w-0 flex-1">
+      {% include "partials/title.html" %}
+    </div>
+    <span id="save-status" class="shrink-0 text-xs text-stone-500" aria-live="polite"></span>
+    <div class="flex shrink-0 items-center gap-1">
+      <button
+        id="annotation-prev"
+        type="button"
+        class="rounded-md border border-stone-200 px-2 py-1 text-xs hover:bg-stone-100"
+      >
+        &uarr;
+      </button>
+      <span id="annotation-counter" class="min-w-14 text-center text-xs text-stone-500">0 / 0</span>
+      <button
+        id="annotation-next"
+        type="button"
+        class="rounded-md border border-stone-200 px-2 py-1 text-xs hover:bg-stone-100"
+      >
+        &darr;
+      </button>
+    </div>
+  </div>
+</header>
+
+<main class="mx-auto flex max-w-6xl items-start gap-8 px-6 py-10">
+  <div id="editor" class="max-w-2xl flex-1 font-serif text-lg leading-8"></div>
+
+  <aside class="w-80 shrink-0 space-y-6">
+    <div id="sidebar" class="relative w-80">
+      {% include "partials/annotation_list.html" %}
+    </div>
+    <section
+      id="revisions"
+      hx-get="/documents/{{ doc.id }}/revisions"
+      hx-trigger="load"
+      hx-swap="innerHTML"
+    ></section>
+  </aside>
+</main>
+
+<script id="doc-data" type="application/json">{{ doc_data | tojson }}</script>
+{% endblock %}

@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}{{ doc.title }} — revision{% endblock %}
+{% block body %}
+<header class="sticky top-0 z-10 border-b border-stone-200 bg-stone-50/90 backdrop-blur">
+  <div class="mx-auto flex max-w-6xl items-center gap-4 px-6 py-3">
+    <a href="/documents/{{ doc.id }}" class="shrink-0 text-sm text-stone-500 hover:underline">
+      &larr; Back to document
+    </a>
+    <h1 class="min-w-0 flex-1 truncate text-lg font-semibold tracking-tight">{{ doc.title }}</h1>
+    <button
+      type="button"
+      class="shrink-0 rounded-md bg-stone-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-stone-700"
+      hx-post="/revisions/{{ revision.id }}/restore"
+      hx-confirm="Restore this revision? The current text is snapshotted first."
+      hx-swap="none"
+    >
+      Restore
+    </button>
+  </div>
+</header>
+
+<div class="border-b border-amber-200 bg-amber-50 px-6 py-2 text-center text-sm text-amber-900">
+  Read only. Revision from {{ revision.created_at[:16] | replace("T", " ") }}{% if revision.label %},
+  labelled “{{ revision.label }}”{% endif %}{% if revision.is_major %} (major){% endif %}.
+</div>
+
+<main class="mx-auto flex max-w-6xl items-start gap-8 px-6 py-10">
+  <div id="editor" class="max-w-2xl flex-1 font-serif text-lg leading-8"></div>
+
+  <aside class="w-80 shrink-0">
+    <div id="sidebar" class="relative w-80">
+      {% with readonly = True %}
+        {% include "partials/annotation_list.html" %}
+      {% endwith %}
+    </div>
+  </aside>
+</main>
+
+<script id="doc-data" type="application/json">{{ doc_data | tojson }}</script>
+{% endblock %}
