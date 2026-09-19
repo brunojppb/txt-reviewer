@@ -61,9 +61,41 @@ export function rangeOf(segments, start, end) {
   return from !== null && to !== null && to > from ? { from, to } : null
 }
 
+const WORD_CHAR = /[\p{L}\p{N}_]/u
+
+/** True when a character is a letter, a digit, or an underscore. */
+function isWordChar(char) {
+  return char !== undefined && WORD_CHAR.test(char)
+}
+
+/** True when neither edge of a hit sits against a word character. */
+function isWordBoundaryHit(text, index, length) {
+  const before = index > 0 ? text[index - 1] : undefined
+  const after = index + length < text.length ? text[index + length] : undefined
+  return !isWordChar(before) && !isWordChar(after)
+}
+
+/**
+ * Finds needle in text, preferring a hit whose edges are both word
+ * boundaries. A short target can otherwise match inside a longer word.
+ * Falls back to the first substring hit so a genuine fragment still
+ * resolves, which also keeps an already boundary-aligned quote unmoved.
+ */
+function locate(text, needle) {
+  const first = text.indexOf(needle)
+  if (first < 0) return -1
+
+  let index = first
+  while (index >= 0) {
+    if (isWordBoundaryHit(text, index, needle.length)) return index
+    index = text.indexOf(needle, index + 1)
+  }
+  return first
+}
+
 /** Finds a quote inside a block by exact text match. */
 export function findExact(block, quote) {
-  const index = block.text.indexOf(quote)
+  const index = locate(block.text, quote)
   if (index < 0) return null
   return rangeOf(block.segments, index, index + quote.length)
 }
@@ -74,7 +106,7 @@ export function findNormalized(block, quote) {
   if (!needle) return null
 
   const hay = normalize(block.text)
-  const index = hay.text.indexOf(needle)
+  const index = locate(hay.text, needle)
   if (index < 0) return null
 
   const start = hay.map[index]
