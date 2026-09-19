@@ -2,7 +2,7 @@ import { createEditor } from './editor.js'
 import { mountSidebar, scheduleLayout } from './sidebar.js'
 import { mountPasses } from './passes.js'
 import { mountChanges } from './changes.js'
-import { mountEdits } from './edits.js'
+import { mountEdits, scheduleRefreshRows } from './edits.js'
 
 const SAVE_DELAY = 800
 
@@ -82,6 +82,7 @@ function boot() {
     onUpdate: (instance) => {
       scheduleLayout()
       updateWordCount(instance)
+      scheduleRefreshRows()
       save?.(instance)
     },
   })
