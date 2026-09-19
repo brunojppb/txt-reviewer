@@ -193,7 +193,7 @@ def _edit_reason(edit: Any, quote: str, suggests: bool) -> str | None:
     target = str(edit.get("target", "")).strip()
     if not 1 <= len(target) <= QUOTE_MAX:
         return "target too long"
-    if len(str(edit.get("replacement", ""))) > REPLACEMENT_MAX:
+    if len(str(edit.get("replacement", "")).strip()) > REPLACEMENT_MAX:
         return "replacement too long"
     if not _holds(quote, target):
         return "target not in quote"
@@ -265,7 +265,7 @@ def submit_findings(run_id: str, findings: list[Finding]) -> dict[str, Any]:
                     created["id"],
                     position,
                     str(edit.get("target", "")).strip(),
-                    str(edit.get("replacement", "")),
+                    str(edit.get("replacement", "")).strip(),
                 )
                 position += 1
 
