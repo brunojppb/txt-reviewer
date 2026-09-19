@@ -9,13 +9,14 @@ instructions from `app/coach.py`.
 A local web app for workshopping prose. A writer keeps documents in a
 Notion-style editor. An agent runs editing passes over a document through an
 MCP server and submits findings. A finding names a problem with a verbatim
-quote, a paragraph number, and a note. The writer rewrites by hand and accepts
-or rejects each finding in the sidebar.
+quote, a paragraph number, and a note. The writer rewrites by hand or takes
+a suggested edit, then accepts or rejects each finding in the sidebar.
 
 Read the specs before you change behaviour:
 
 - `docs/superpowers/specs/2026-09-19-workshop-bones-design.md`
 - `docs/superpowers/specs/2026-09-19-editing-passes-mcp-design.md`
+- `docs/superpowers/specs/2026-09-19-finding-edits-design.md`
 
 ## Commands
 
@@ -52,7 +53,7 @@ framework.
 | `app/templates/` | Jinja2 pages and `partials/` for HTMX swaps |
 | `assets/js/editor.js` | TipTap setup |
 | `assets/js/annotation-mark.js` | the `annotation` mark: `id`, `kind`, `pass` |
-| `assets/js/annotation-state.js` | decoration plugin for active, resolved, dimmed |
+| `assets/js/annotation-state.js` | decoration plugin for active, resolved, dimmed, preview |
 | `assets/js/anchor.js` | finds a quote and applies the mark |
 | `assets/js/sidebar.js` | card layout, active state, prev and next |
 | `assets/js/passes.js` | current pass, filter, panel |
