@@ -1,3 +1,5 @@
+import { onChange } from './passes.js'
+
 const GAP = 8
 
 const state = {
@@ -7,6 +9,8 @@ const state = {
   activeId: null,
   order: [],
   resolved: [],
+  passSlug: null,
+  filterOn: false,
 }
 
 let frame = 0
@@ -29,6 +33,12 @@ function marksFor(id) {
   return Array.from(
     state.editorElement.querySelectorAll(`mark[data-annotation-id="${CSS.escape(id)}"]`),
   )
+}
+
+/** True when the pass filter hides this card. */
+function isFiltered(card) {
+  if (!state.filterOn) return false
+  return (card?.dataset.passSlug || null) !== state.passSlug
 }
 
 function cardFor(id) {
@@ -126,6 +136,15 @@ export function layoutSidebar() {
   const marks = collectMarks()
   const cards = Array.from(state.sidebar.querySelectorAll('.annotation-card[data-annotation-id]'))
 
+  // Accepted and rejected annotations keep no highlight.
+  const closed = (state.sidebar.querySelector('[data-closed-ids]')?.dataset.closedIds || '')
+    .split(',')
+    .filter((id) => id && marks.has(id))
+  if (closed.length) {
+    closed.forEach((id) => state.editor?.commands.unsetAnnotationById(id))
+    return
+  }
+
   const byId = new Map()
   cards.forEach((card) => {
     const id = card.dataset.annotationId
@@ -151,7 +170,9 @@ export function layoutSidebar() {
   const detached = []
   const resolved = []
   byId.forEach((card, id) => {
-    if (card.dataset.status === 'resolved') resolved.push(id)
+    // Findings keep their mark only while they are open.
+    if (card.dataset.status && card.dataset.status !== 'open') resolved.push(id)
+    card.hidden = isFiltered(card)
     if (marks.has(id)) {
       clearDetached(card)
     } else if (!card.dataset.orphan) {
@@ -168,7 +189,10 @@ export function layoutSidebar() {
     }
   })
 
-  state.order = [...marks.keys(), ...detached]
+  state.order = [...marks.keys(), ...detached].filter((id) => {
+    const card = byId.get(id)
+    return card && !card.hidden
+  })
 
   let bottom = 0
   state.order.forEach((id) => {
@@ -201,6 +225,7 @@ function paintActive() {
   state.editor?.commands.setAnnotationState({
     activeId: state.activeId,
     resolved: state.resolved,
+    dimPass: state.filterOn ? state.passSlug : null,
   })
 }
 
@@ -272,7 +297,8 @@ function onKeydown(event) {
   step(event.key === 'ArrowDown' ? 1 : -1)
 }
 
-function onAnnotationDeleted(event) {
+/** Drops the mark of an annotation the writer deleted, accepted or rejected. */
+function onAnnotationGone(event) {
   const id = event.detail?.id ?? event.detail?.value?.id
   if (!id) return
   state.editor?.commands.unsetAnnotationById(id)
@@ -305,7 +331,14 @@ export function mountSidebar({ editor, editorElement }) {
 
   sidebar.addEventListener('htmx:afterSwap', scheduleLayout)
   sidebar.addEventListener('htmx:afterSettle', scheduleLayout)
-  document.body.addEventListener('annotation:deleted', onAnnotationDeleted)
+  document.body.addEventListener('annotation:deleted', onAnnotationGone)
+  document.body.addEventListener('annotation:closed', onAnnotationGone)
+
+  onChange(({ slug, filterOn }) => {
+    state.passSlug = slug
+    state.filterOn = filterOn
+    scheduleLayout()
+  })
 
   window.addEventListener('resize', scheduleLayout)
   new ResizeObserver(scheduleLayout).observe(editorElement)

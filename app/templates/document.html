@@ -2,11 +2,12 @@
 {% block title %}{{ doc.title }}{% endblock %}
 {% block body %}
 <header class="sticky top-0 z-10 border-b border-stone-200 bg-stone-50/90 backdrop-blur">
-  <div class="mx-auto flex max-w-6xl items-center gap-4 px-6 py-3">
+  <div class="mx-auto flex max-w-7xl items-center gap-4 px-6 py-3">
     <a href="/" class="shrink-0 text-sm text-stone-500 hover:underline">&larr; Documents</a>
     <div class="min-w-0 flex-1">
       {% include "partials/title.html" %}
     </div>
+    <span id="word-count" class="shrink-0 text-xs text-stone-500">{{ word_count }} words</span>
     <span id="save-status" class="shrink-0 text-xs text-stone-500" aria-live="polite"></span>
     <div class="flex shrink-0 items-center gap-1">
       <button
@@ -25,14 +26,65 @@
         &darr;
       </button>
     </div>
+    <button
+      id="passes-toggle"
+      type="button"
+      class="shrink-0 rounded-md border border-stone-200 px-2 py-1 text-xs hover:bg-stone-100"
+    >
+      Passes
+    </button>
+    <a href="/passes" class="shrink-0 text-xs text-stone-500 hover:underline">Edit passes</a>
+  </div>
+
+  <div id="pass-toolbar" class="mx-auto flex max-w-7xl items-center gap-2 px-6 pb-2 text-xs">
+    <button
+      id="pass-prev"
+      type="button"
+      class="rounded-md border border-stone-200 px-2 py-1 hover:bg-stone-100"
+    >
+      &larr;
+    </button>
+    <select
+      id="pass-select"
+      class="min-w-0 max-w-64 flex-1 rounded-md border border-stone-200 bg-white px-2 py-1"
+      aria-label="Editing pass"
+    >
+      {% for p in passes %}
+        <option value="{{ p.id }}" data-slug="{{ p.slug }}" data-number="{{ p.position }}">
+          {{ p.position }}. {{ p.title }}
+        </option>
+      {% endfor %}
+    </select>
+    <button
+      id="pass-next"
+      type="button"
+      class="rounded-md border border-stone-200 px-2 py-1 hover:bg-stone-100"
+    >
+      &rarr;
+    </button>
+    <span id="pass-run-count" class="text-stone-500">0 / {{ passes | length }} run</span>
+    <button
+      id="pass-filter"
+      type="button"
+      aria-pressed="false"
+      class="ml-auto rounded-md border border-stone-200 px-2 py-1 hover:bg-stone-100 aria-pressed:bg-stone-900 aria-pressed:text-white"
+    >
+      Only this pass
+    </button>
   </div>
 </header>
 
-<main class="mx-auto flex max-w-6xl items-start gap-8 px-6 py-10">
+<main class="mx-auto flex max-w-7xl items-start gap-8 px-6 py-10">
   <div id="editor" class="max-w-2xl flex-1 font-serif text-lg leading-8"></div>
 
   <aside class="w-80 shrink-0 space-y-6">
-    <div id="sidebar" class="relative w-80">
+    <div
+      id="sidebar"
+      class="relative w-80"
+      hx-get="/documents/{{ doc.id }}/annotations"
+      hx-trigger="refresh"
+      hx-swap="innerHTML"
+    >
       {% include "partials/annotation_list.html" %}
     </div>
     <section
@@ -42,6 +94,15 @@
       hx-swap="innerHTML"
     ></section>
   </aside>
+
+  <aside
+    id="passes-panel"
+    class="w-72 shrink-0"
+    hidden
+    hx-get="/documents/{{ doc.id }}/passes-panel"
+    hx-trigger="load, changes from:body"
+    hx-swap="innerHTML"
+  ></aside>
 </main>
 
 <script id="doc-data" type="application/json">{{ doc_data | tojson }}</script>

@@ -3,7 +3,8 @@ import { Mark, mergeAttributes } from '@tiptap/core'
 /**
  * TipTap mark that ties a span of text to one annotation record.
  *
- * Adds the commands `setAnnotation` and `unsetAnnotationById`.
+ * Adds the commands `setAnnotation({ id, kind, pass })` and
+ * `unsetAnnotationById(id)`.
  */
 export const Annotation = Mark.create({
   name: 'annotation',
@@ -26,6 +27,12 @@ export const Annotation = Mark.create({
         default: 'comment',
         parseHTML: (element) => element.getAttribute('data-kind') || 'comment',
         renderHTML: (attributes) => ({ 'data-kind': attributes.kind || 'comment' }),
+      },
+      // The slug of the pass that found this, or null for a manual annotation.
+      pass: {
+        default: null,
+        parseHTML: (element) => element.getAttribute('data-pass') || null,
+        renderHTML: (attributes) => (attributes.pass ? { 'data-pass': attributes.pass } : {}),
       },
     }
   },

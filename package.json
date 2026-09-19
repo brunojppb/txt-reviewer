@@ -9,7 +9,8 @@
     "build:js": "esbuild assets/js/main.js --bundle --minify --outfile=app/static/js/app.js",
     "build:vendor": "mkdir -p app/static/vendor && cp node_modules/htmx.org/dist/htmx.min.js app/static/vendor/htmx.min.js",
     "build": "npm run build:css && npm run build:js && npm run build:vendor",
-    "watch": "npm run build:vendor && (tailwindcss -i assets/css/app.css -o app/static/css/app.css --watch & esbuild assets/js/main.js --bundle --outfile=app/static/js/app.js --watch)"
+    "watch": "npm run build:vendor && (tailwindcss -i assets/css/app.css -o app/static/css/app.css --watch & esbuild assets/js/main.js --bundle --outfile=app/static/js/app.js --watch)",
+    "check": "for f in assets/js/*.js; do node --check \"$f\" || exit 1; done && esbuild assets/js/main.js --bundle --outfile=/dev/null"
   },
   "devDependencies": {
     "@tailwindcss/cli": "^4.3.3",

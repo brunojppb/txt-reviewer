@@ -1,0 +1,14 @@
+{% for group in groups %}
+  <h2 class="mb-2 mt-6 text-xs font-semibold uppercase tracking-wide text-stone-400">
+    {{ group.name }}
+  </h2>
+  <ul class="divide-y divide-stone-200 rounded-lg border border-stone-200 bg-white">
+    {% for p in group.passes %}
+      {% include "partials/pass_row.html" %}
+    {% endfor %}
+  </ul>
+{% else %}
+  <p class="rounded-lg border border-stone-200 bg-white px-4 py-8 text-center text-sm text-stone-500">
+    No editing pass yet.
+  </p>
+{% endfor %}

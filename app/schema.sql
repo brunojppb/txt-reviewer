@@ -1,3 +1,6 @@
+-- Schema version 1. app/db.py migrates a database from here to the
+-- current version.
+
 CREATE TABLE IF NOT EXISTS documents (
   id TEXT PRIMARY KEY,
   title TEXT NOT NULL DEFAULT 'Untitled',

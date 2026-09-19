@@ -89,7 +89,7 @@ async function annotate({ kind, getEditor, docId, element }) {
 
   const id = crypto.randomUUID()
   beginAnnotation(id)
-  editor.chain().focus().setAnnotation({ id, kind }).run()
+  editor.chain().focus().setAnnotation({ id, kind, pass: null }).run()
 
   const buttons = element.querySelectorAll('[data-annotate-kind]')
   buttons.forEach((el) => {

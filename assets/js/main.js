@@ -1,5 +1,7 @@
 import { createEditor } from './editor.js'
 import { mountSidebar, scheduleLayout } from './sidebar.js'
+import { mountPasses } from './passes.js'
+import { mountChanges } from './changes.js'
 
 const SAVE_DELAY = 800
 
@@ -23,6 +25,14 @@ function parseContent(content) {
     console.error('Could not read the document content', error)
     return undefined
   }
+}
+
+/** Writes the editor word count into `#word-count`. */
+function updateWordCount(editor) {
+  const node = document.getElementById('word-count')
+  if (!node) return
+  const words = editor.getText().split(/\s+/).filter(Boolean).length
+  node.textContent = `${words.toLocaleString('en-US')} words`
 }
 
 function setStatus(text) {
@@ -70,11 +80,15 @@ function boot() {
     docId,
     onUpdate: (instance) => {
       scheduleLayout()
+      updateWordCount(instance)
       save?.(instance)
     },
   })
 
+  updateWordCount(editor)
+  mountPasses({ docId })
   mountSidebar({ editor, editorElement: editor.view.dom })
+  mountChanges({ editor, docId, readOnly })
   // Handy for debugging from the browser console.
   window.workshopEditor = editor
 }
