@@ -147,3 +147,15 @@ def test_the_migration_flags_a_pass_that_is_already_there(tmp_path) -> None:
     assert repo.get_pass(conn, "p1")["suggests_edits"] == 1
     assert len(db.SUGGESTING_SLUGS) == 9
     conn.close()
+
+
+def test_seeding_flags_the_suggesting_passes(tmp_path, monkeypatch) -> None:
+    path = tmp_path / "seed-flags.db"
+    monkeypatch.setenv("WORKSHOP_DB", str(path))
+
+    db.init_db(path)
+
+    conn = db.get_conn(path)
+    flagged = {p["slug"] for p in repo.list_passes(conn) if p["suggests_edits"]}
+    conn.close()
+    assert flagged == set(db.SUGGESTING_SLUGS)
