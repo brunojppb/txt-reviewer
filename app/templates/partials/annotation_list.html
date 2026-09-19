@@ -1,3 +1,5 @@
+{# Marks for closed annotations must leave the document; the sidebar reads this. #}
+<template data-closed-ids="{{ closed_ids | default([]) | join(',') }}"></template>
 {% for a in annotations %}
   {% include "partials/annotation_card.html" %}
 {% endfor %}

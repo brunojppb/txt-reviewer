@@ -4,9 +4,10 @@ import { Decoration, DecorationSet } from '@tiptap/pm/view'
 
 export const annotationStateKey = new PluginKey('annotationState')
 
-// ProseMirror redraws marks whose DOM changes behind its back, so active and
-// resolved styling goes through decorations instead of class toggles.
-function buildDecorations(doc, { activeId, resolved }) {
+// ProseMirror redraws marks whose DOM changes behind its back, so active,
+// resolved and dimmed styling goes through decorations instead of class
+// toggles.
+function buildDecorations(doc, { activeId, resolved, dimPass }) {
   const decorations = []
   doc.descendants((node, pos) => {
     if (!node.isText) return
@@ -16,6 +17,7 @@ function buildDecorations(doc, { activeId, resolved }) {
       const classes = []
       if (id === activeId) classes.push('is-active')
       if (resolved.has(id)) classes.push('is-resolved')
+      if (dimPass && mark.attrs.pass !== dimPass) classes.push('is-dimmed')
       if (classes.length) {
         decorations.push(
           Decoration.inline(pos, pos + node.nodeSize, { class: classes.join(' ') }),
@@ -27,10 +29,11 @@ function buildDecorations(doc, { activeId, resolved }) {
 }
 
 /**
- * Paints the active and resolved annotation states over the marks.
+ * Paints the active, resolved and dimmed annotation states over the marks.
  *
- * Command: `setAnnotationState({ activeId, resolved })` where `resolved` is
- * an iterable of annotation ids. Omitted fields keep their value.
+ * Command: `setAnnotationState({ activeId, resolved, dimPass })` where
+ * `resolved` is an iterable of annotation ids and `dimPass` is a pass slug or
+ * null. Omitted fields keep their value.
  */
 export const AnnotationState = Extension.create({
   name: 'annotationState',
@@ -51,16 +54,23 @@ export const AnnotationState = Extension.create({
       new Plugin({
         key: annotationStateKey,
         state: {
-          init: () => ({ activeId: null, resolved: new Set(), decorations: DecorationSet.empty }),
+          init: () => ({
+            activeId: null,
+            resolved: new Set(),
+            dimPass: null,
+            decorations: DecorationSet.empty,
+          }),
           apply(tr, prev, _oldState, newState) {
             const meta = tr.getMeta(annotationStateKey)
             if (!meta && !tr.docChanged) return prev
             const activeId = meta && 'activeId' in meta ? meta.activeId : prev.activeId
             const resolved = meta && 'resolved' in meta ? new Set(meta.resolved) : prev.resolved
+            const dimPass = meta && 'dimPass' in meta ? meta.dimPass || null : prev.dimPass
             return {
               activeId,
               resolved,
-              decorations: buildDecorations(newState.doc, { activeId, resolved }),
+              dimPass,
+              decorations: buildDecorations(newState.doc, { activeId, resolved, dimPass }),
             }
           },
         },

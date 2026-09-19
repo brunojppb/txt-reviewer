@@ -1,0 +1,95 @@
+<li
+  id="pass-{{ p.id }}"
+  class="pass-item px-4 py-3"
+  data-pass-id="{{ p.id }}"
+  data-slug="{{ p.slug }}"
+  data-number="{{ p.position }}"
+>
+  <details>
+    <summary class="flex cursor-pointer items-center gap-3 text-sm">
+      <span class="w-6 shrink-0 text-right text-xs text-stone-400">{{ p.position }}</span>
+      <span class="min-w-0 flex-1 truncate font-medium">{{ p.title }}</span>
+      <span class="shrink-0 rounded-full bg-stone-100 px-2 py-0.5 text-xs text-stone-600">
+        {{ p.group_name }}
+      </span>
+      <span class="shrink-0 text-xs {{ "text-emerald-600" if p.enabled else "text-stone-400" }}">
+        {{ "on" if p.enabled else "off" }}
+      </span>
+    </summary>
+
+    <form
+      class="mt-3 flex flex-col gap-2"
+      hx-put="/passes/{{ p.id }}"
+      hx-target="#pass-{{ p.id }}"
+      hx-swap="outerHTML"
+    >
+      <div class="flex gap-2">
+        <input
+          type="text"
+          name="title"
+          value="{{ p.title }}"
+          aria-label="Title"
+          class="min-w-0 flex-1 rounded border border-stone-200 px-2 py-1 text-sm outline-none focus:border-stone-400"
+        />
+        <input
+          type="text"
+          name="group_name"
+          value="{{ p.group_name }}"
+          aria-label="Group"
+          class="min-w-0 flex-1 rounded border border-stone-200 px-2 py-1 text-sm outline-none focus:border-stone-400"
+        />
+      </div>
+      <textarea
+        name="prompt"
+        rows="6"
+        aria-label="Prompt"
+        class="w-full resize-y rounded border border-stone-200 p-2 text-sm outline-none focus:border-stone-400"
+      >{{ p.prompt }}</textarea>
+      <div class="flex items-center gap-3 text-xs">
+        <label class="flex items-center gap-2 text-stone-600">
+          <input type="checkbox" name="enabled" value="1" {{ "checked" if p.enabled }} /> Enabled
+        </label>
+        <code class="text-stone-400">{{ p.slug }}</code>
+        <button
+          type="submit"
+          class="ml-auto rounded-md bg-stone-900 px-3 py-1 font-medium text-white hover:bg-stone-700"
+        >
+          Save
+        </button>
+      </div>
+    </form>
+
+    <div class="mt-2 flex items-center gap-3 text-xs">
+      <button
+        type="button"
+        class="text-stone-600 hover:underline"
+        hx-post="/passes/{{ p.id }}/move"
+        hx-vals='{"direction": "up"}'
+        hx-target="#pass-list"
+        hx-swap="innerHTML"
+      >
+        Move up
+      </button>
+      <button
+        type="button"
+        class="text-stone-600 hover:underline"
+        hx-post="/passes/{{ p.id }}/move"
+        hx-vals='{"direction": "down"}'
+        hx-target="#pass-list"
+        hx-swap="innerHTML"
+      >
+        Move down
+      </button>
+      <button
+        type="button"
+        class="text-stone-600 hover:underline hover:text-red-700"
+        hx-delete="/passes/{{ p.id }}"
+        hx-confirm="Delete “{{ p.title }}”?"
+        hx-target="#pass-list"
+        hx-swap="innerHTML"
+      >
+        Delete
+      </button>
+    </div>
+  </details>
+</li>

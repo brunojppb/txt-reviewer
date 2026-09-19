@@ -160,6 +160,12 @@
     box-shadow: inset 0 -2px 0 var(--color-violet-300);
   }
 
+  /* A finding underlines instead of filling, so it reads as the agent's note. */
+  .annotation--finding {
+    @apply bg-rose-50 underline decoration-rose-400 decoration-2 underline-offset-[3px];
+    box-shadow: none;
+  }
+
   /* Active and resolved state arrive as a decoration span inside the mark. */
   .annotation--comment:has(.is-active) {
     @apply bg-amber-300;
@@ -173,6 +179,10 @@
     @apply bg-violet-300;
   }
 
+  .annotation--finding:has(.is-active) {
+    @apply bg-rose-200;
+  }
+
   .annotation:has(.is-resolved) {
     @apply bg-stone-100 text-stone-500;
     box-shadow: none;
@@ -181,6 +191,28 @@
 
   .annotation:has(.is-resolved.is-active) {
     @apply bg-stone-200;
+  }
+
+  /* Dimmed marks belong to another pass than the one the writer filters on. */
+  .annotation:has(.is-dimmed) {
+    @apply bg-transparent decoration-stone-300;
+    box-shadow: none;
+  }
+
+  .annotation--comment:has(.is-dimmed.is-active) {
+    @apply bg-amber-300;
+  }
+
+  .annotation--suggestion:has(.is-dimmed.is-active) {
+    @apply bg-sky-300;
+  }
+
+  .annotation--question:has(.is-dimmed.is-active) {
+    @apply bg-violet-300;
+  }
+
+  .annotation--finding:has(.is-dimmed.is-active) {
+    @apply bg-rose-200;
   }
 
   /* ---- annotation cards ---- */
@@ -215,6 +247,28 @@
 
   .annotation-badge--question {
     @apply bg-violet-100 text-violet-800;
+  }
+
+  .annotation-badge--finding {
+    @apply bg-rose-100 text-rose-800;
+  }
+
+  /* Pass titles are sentences; small caps would truncate them. */
+  .annotation-card[data-source="pass"] .annotation-badge {
+    text-transform: none;
+    letter-spacing: normal;
+  }
+
+  /* ---- editing passes ---- */
+
+  .pass-row {
+    position: relative;
+    cursor: pointer;
+    transition: background-color 120ms ease;
+  }
+
+  .pass-row:hover {
+    @apply bg-stone-50;
   }
 
   /* ---- floating panels ---- */
@@ -312,4 +366,27 @@
 .annotation-card.is-orphan {
   background-color: var(--color-stone-50);
   border-style: dashed;
+}
+
+/* Pass state. Unlayered so it beats the utility classes on the markup. */
+.pass-row.is-current {
+  background-color: var(--color-stone-100);
+  box-shadow: inset 3px 0 0 var(--color-stone-700);
+}
+
+#pass-filter.is-on {
+  background-color: var(--color-stone-800);
+  border-color: var(--color-stone-800);
+  color: var(--color-stone-50);
+}
+
+.annotation-card[data-source="pass"].is-active::before {
+  background: var(--color-rose-400);
+}
+
+/* The pass filter and the panel toggle hide through the hidden attribute. */
+.annotation-card[hidden],
+#passes-panel[hidden],
+#pass-toolbar[hidden] {
+  display: none !important;
 }

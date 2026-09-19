@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Editing passes{% endblock %}
+{% block body %}
+<main class="mx-auto max-w-3xl px-6 py-12">
+  <header class="mb-8 flex items-center justify-between gap-4">
+    <h1 class="text-2xl font-semibold tracking-tight">Editing passes</h1>
+    <a href="/" class="text-sm text-stone-500 hover:underline">&larr; Documents</a>
+  </header>
+
+  <form
+    class="mb-8 flex flex-col gap-2 rounded-lg border border-stone-200 bg-white p-4"
+    hx-post="/passes"
+    hx-target="#pass-list"
+    hx-swap="innerHTML"
+  >
+    <div class="flex gap-2">
+      <input
+        type="text"
+        name="title"
+        placeholder="Title"
+        required
+        class="min-w-0 flex-1 rounded border border-stone-200 px-2 py-1 text-sm outline-none focus:border-stone-400"
+      />
+      <input
+        type="text"
+        name="group_name"
+        placeholder="Group"
+        class="min-w-0 flex-1 rounded border border-stone-200 px-2 py-1 text-sm outline-none focus:border-stone-400"
+      />
+    </div>
+    <textarea
+      name="prompt"
+      rows="3"
+      placeholder="What does this pass look for?"
+      class="w-full resize-y rounded border border-stone-200 p-2 text-sm outline-none focus:border-stone-400"
+    ></textarea>
+    <button
+      type="submit"
+      class="self-start rounded-md bg-stone-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-stone-700"
+    >
+      Add pass
+    </button>
+  </form>
+
+  <div id="pass-list">
+    {% include "partials/pass_list.html" %}
+  </div>
+</main>
+{% endblock %}

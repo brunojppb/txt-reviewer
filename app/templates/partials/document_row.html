@@ -2,6 +2,7 @@
   <a href="/documents/{{ doc.id }}" class="min-w-0 flex-1 truncate font-medium hover:underline">
     {{ doc.title }}
   </a>
+  <span class="shrink-0 text-xs text-stone-500">{{ doc.word_count }} words</span>
   <time class="shrink-0 text-xs text-stone-500">{{ doc.updated_at[:16] | replace("T", " ") }}</time>
   <button
     type="button"

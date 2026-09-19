@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import sqlite3
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Annotated, Any
 
@@ -12,9 +13,12 @@ from fastapi import Depends, FastAPI, Form, HTTPException, Request, Response
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from starlette.routing import Route
+from starlette.types import Receive, Scope, Send
 
-from app import repo
+from app import repo, text
 from app.db import db_path, get_db, init_db
+from app.mcp_server import server as mcp_server
 
 BASE_DIR = Path(__file__).parent
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
@@ -22,11 +26,29 @@ templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 Conn = Annotated[sqlite3.Connection, Depends(get_db)]
 
 
+class MCPEndpoint:
+    """The ASGI endpoint of the MCP server. It serves the whole protocol."""
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        await mcp_server.session_manager.asgi_app(scope, receive, send)
+
+
+def build_mcp_transport() -> None:
+    """Give the MCP server a session manager for the streamable HTTP transport."""
+    mcp_server.streamable_http_app(
+        streamable_http_path="/mcp", stateless_http=True, json_response=True
+    )
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Create the schema before the app serves any request."""
+    """Migrate the database and start the MCP session manager."""
     init_db(db_path())
-    yield
+    # A session manager runs once, so every startup builds a fresh one. The
+    # endpoint above asks for the current one on each request.
+    build_mcp_transport()
+    async with mcp_server.session_manager.run():
+        yield
 
 
 app = FastAPI(lifespan=lifespan)
@@ -35,6 +57,34 @@ app.mount(
     StaticFiles(directory=str(BASE_DIR / "static"), check_dir=False),
     name="static",
 )
+# A route, not a mount: the endpoint answers at exactly /mcp, where a mount
+# would send clients to /mcp/ through a redirect.
+app.router.routes.append(Route("/mcp", endpoint=MCPEndpoint()))
+
+
+def ago(value: str | None) -> str:
+    """Return how long ago an ISO 8601 time was, in words."""
+    if not value:
+        return ""
+    try:
+        moment = datetime.fromisoformat(value)
+    except (TypeError, ValueError):
+        return ""
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=timezone.utc)
+    minutes = int((datetime.now(timezone.utc) - moment).total_seconds() // 60)
+    if minutes < 1:
+        return "just now"
+    if minutes < 60:
+        return f"{minutes} minute{'' if minutes == 1 else 's'} ago"
+    hours = minutes // 60
+    if hours < 24:
+        return f"{hours} hour{'' if hours == 1 else 's'} ago"
+    days = hours // 24
+    return f"{days} day{'' if days == 1 else 's'} ago"
+
+
+templates.env.filters["ago"] = ago
 
 
 def parse_json(raw: str, fallback: Any) -> Any:
@@ -58,6 +108,12 @@ def render(request: Request, name: str, context: dict[str, Any]) -> HTMLResponse
 def hx_redirect(url: str) -> Response:
     """Return an empty 200 that tells htmx to move the browser."""
     return Response(status_code=200, headers={"HX-Redirect": url})
+
+
+def hx_trigger(name: str, detail: dict[str, Any]) -> Response:
+    """Return an empty 200 that fires an htmx event in the browser."""
+    trigger = json.dumps({name: detail})
+    return Response(status_code=200, headers={"HX-Trigger": trigger})
 
 
 def need_document(conn: sqlite3.Connection, doc_id: str) -> dict[str, Any]:
@@ -84,6 +140,14 @@ def need_revision(conn: sqlite3.Connection, rid: str) -> dict[str, Any]:
     return revision
 
 
+def need_pass(conn: sqlite3.Connection, pid: str) -> dict[str, Any]:
+    """Return a pass or raise 404."""
+    found = repo.get_pass(conn, pid)
+    if found is None:
+        raise HTTPException(status_code=404, detail="pass not found")
+    return found
+
+
 def card(request: Request, annotation: dict[str, Any]) -> HTMLResponse:
     """Render one annotation card."""
     return render(
@@ -104,13 +168,40 @@ def revision_panel(
     )
 
 
+def pass_groups(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Group passes by their group name, in order of first appearance."""
+    groups: list[dict[str, Any]] = []
+    index: dict[str, dict[str, Any]] = {}
+    for row in rows:
+        name = row["group_name"] or "Other"
+        group = index.get(name)
+        if group is None:
+            group = {"name": name, "passes": []}
+            index[name] = group
+            groups.append(group)
+        group["passes"].append(row)
+    return groups
+
+
+def pass_list(request: Request, conn: sqlite3.Connection) -> HTMLResponse:
+    """Render the pass list of the passes page."""
+    return render(
+        request,
+        "partials/pass_list.html",
+        {"groups": pass_groups(repo.list_passes(conn))},
+    )
+
+
 # Documents
 
 
 @app.get("/", response_class=HTMLResponse)
 def index(request: Request, conn: Conn) -> HTMLResponse:
     """Show every document, most recently updated first."""
-    return render(request, "index.html", {"documents": repo.list_documents(conn)})
+    documents = repo.list_documents(conn)
+    for doc in documents:
+        doc["word_count"] = text.document_word_count(doc["content"])
+    return render(request, "index.html", {"documents": documents})
 
 
 @app.post("/documents")
@@ -124,10 +215,11 @@ def create_document(conn: Conn) -> Response:
 def document_page(request: Request, doc_id: str, conn: Conn) -> HTMLResponse:
     """Show the editor page of one document."""
     doc = need_document(conn, doc_id)
+    content = parse_json(doc["content"], empty_doc())
     doc_data = {
         "id": doc["id"],
         "title": doc["title"],
-        "content": parse_json(doc["content"], empty_doc()),
+        "content": content,
         "readOnly": False,
     }
     return render(
@@ -136,7 +228,10 @@ def document_page(request: Request, doc_id: str, conn: Conn) -> HTMLResponse:
         {
             "doc": doc,
             "doc_data": doc_data,
-            "annotations": repo.list_annotations(conn, doc_id),
+            "annotations": repo.list_annotations(conn, doc_id, open_only=True),
+            "closed_ids": repo.closed_annotation_ids(conn, doc_id),
+            "passes": repo.list_passes(conn, enabled_only=True),
+            "word_count": text.document_word_count(content),
         },
     )
 
@@ -182,17 +277,31 @@ async def save_content(request: Request, doc_id: str, conn: Conn) -> JSONRespons
     return JSONResponse({"ok": True, "updated_at": updated_at})
 
 
+@app.get("/documents/{doc_id}/changes")
+def document_changes(doc_id: str, conn: Conn) -> JSONResponse:
+    """Report the change counter the browser polls."""
+    need_document(conn, doc_id)
+    return JSONResponse({"seq": repo.change_seq(conn, doc_id)})
+
+
 # Annotations
 
 
 @app.get("/documents/{doc_id}/annotations", response_class=HTMLResponse)
-def annotation_list(request: Request, doc_id: str, conn: Conn) -> HTMLResponse:
-    """Show the annotation cards of a document."""
+def annotation_list(
+    request: Request, doc_id: str, conn: Conn, status: str = "open"
+) -> HTMLResponse:
+    """Show the annotation cards of a document. Open ones unless status is all."""
     need_document(conn, doc_id)
+    annotations = repo.list_annotations(conn, doc_id, open_only=status != "all")
     return render(
         request,
         "partials/annotation_list.html",
-        {"annotations": repo.list_annotations(conn, doc_id), "readonly": False},
+        {
+            "annotations": annotations,
+            "closed_ids": repo.closed_annotation_ids(conn, doc_id),
+            "readonly": False,
+        },
     )
 
 
@@ -211,6 +320,7 @@ def create_annotation(
     annotation = repo.create_annotation(conn, doc_id, id, kind)
     if annotation is None:
         raise HTTPException(status_code=409, detail="annotation id already exists")
+    repo.bump_change_seq(conn, doc_id)
     return card(request, annotation)
 
 
@@ -226,33 +336,158 @@ def set_annotation_body(
     annotation = repo.update_annotation_body(conn, aid, body)
     if annotation is None:
         raise HTTPException(status_code=404, detail="annotation not found")
+    repo.bump_change_seq(conn, annotation["document_id"])
     return card(request, annotation)
 
 
-@app.post("/annotations/{aid}/status", response_class=HTMLResponse)
+@app.post("/annotations/{aid}/status")
 def set_annotation_status(
     request: Request,
     aid: str,
     conn: Conn,
     status: Annotated[str, Form()],
-) -> HTMLResponse:
-    """Open or resolve an annotation."""
+) -> Response:
+    """Open, accept, or reject an annotation."""
     need_annotation(conn, aid)
     if status not in repo.STATUSES:
         raise HTTPException(status_code=400, detail="unknown status")
     annotation = repo.set_annotation_status(conn, aid, status)
     if annotation is None:
         raise HTTPException(status_code=404, detail="annotation not found")
+    repo.bump_change_seq(conn, annotation["document_id"])
+    if status in repo.CLOSED_STATUSES:
+        return hx_trigger("annotation:closed", {"id": aid})
     return card(request, annotation)
+
+
+@app.post("/annotations/{aid}/anchored")
+def set_annotation_anchored(
+    aid: str,
+    conn: Conn,
+    anchored: Annotated[str, Form()] = "1",
+) -> Response:
+    """Record whether the browser put the highlight of a finding in the text."""
+    need_annotation(conn, aid)
+    repo.set_anchored(conn, aid, anchored not in ("", "0", "false", "off"))
+    return Response(status_code=200)
 
 
 @app.delete("/annotations/{aid}")
 def delete_annotation(aid: str, conn: Conn) -> Response:
     """Delete an annotation and tell the editor to drop its mark."""
+    annotation = need_annotation(conn, aid)
     if not repo.delete_annotation(conn, aid):
         raise HTTPException(status_code=404, detail="annotation not found")
-    trigger = json.dumps({"annotation:deleted": {"id": aid}})
-    return Response(status_code=200, headers={"HX-Trigger": trigger})
+    repo.bump_change_seq(conn, annotation["document_id"])
+    return hx_trigger("annotation:deleted", {"id": aid})
+
+
+@app.get("/documents/{doc_id}/findings/unanchored")
+def unanchored_findings(doc_id: str, conn: Conn) -> JSONResponse:
+    """List the open findings that wait for a highlight."""
+    need_document(conn, doc_id)
+    return JSONResponse(repo.list_unanchored_findings(conn, doc_id))
+
+
+# Passes
+
+
+@app.get("/passes", response_class=HTMLResponse)
+def passes_page(request: Request, conn: Conn) -> HTMLResponse:
+    """Show the editor for the editing passes."""
+    return render(
+        request, "passes.html", {"groups": pass_groups(repo.list_passes(conn))}
+    )
+
+
+@app.post("/passes", response_class=HTMLResponse)
+def create_pass(
+    request: Request,
+    conn: Conn,
+    title: Annotated[str, Form()] = "",
+    group_name: Annotated[str, Form()] = "",
+    prompt: Annotated[str, Form()] = "",
+) -> HTMLResponse:
+    """Add a pass at the end of the list."""
+    repo.create_pass(conn, title.strip(), group_name.strip(), prompt.strip())
+    return pass_list(request, conn)
+
+
+@app.put("/passes/{pid}", response_class=HTMLResponse)
+def update_pass(
+    request: Request,
+    pid: str,
+    conn: Conn,
+    title: Annotated[str, Form()] = "",
+    group_name: Annotated[str, Form()] = "",
+    prompt: Annotated[str, Form()] = "",
+    enabled: Annotated[str | None, Form()] = None,
+) -> HTMLResponse:
+    """Store the fields of one pass."""
+    need_pass(conn, pid)
+    row = repo.update_pass(
+        conn,
+        pid,
+        title.strip(),
+        group_name.strip(),
+        prompt.strip(),
+        enabled not in (None, "", "0", "false", "off"),
+    )
+    if row is None:
+        raise HTTPException(status_code=404, detail="pass not found")
+    return render(request, "partials/pass_row.html", {"p": row})
+
+
+@app.post("/passes/{pid}/move", response_class=HTMLResponse)
+def move_pass(
+    request: Request,
+    pid: str,
+    conn: Conn,
+    direction: Annotated[str, Form()] = "up",
+) -> HTMLResponse:
+    """Move a pass one place up or down."""
+    need_pass(conn, pid)
+    if direction not in ("up", "down"):
+        raise HTTPException(status_code=400, detail="unknown direction")
+    repo.move_pass(conn, pid, direction)
+    return pass_list(request, conn)
+
+
+@app.delete("/passes/{pid}", response_class=HTMLResponse)
+def delete_pass(request: Request, pid: str, conn: Conn) -> HTMLResponse:
+    """Delete one pass."""
+    need_pass(conn, pid)
+    repo.delete_pass(conn, pid)
+    return pass_list(request, conn)
+
+
+@app.get("/documents/{doc_id}/passes-panel", response_class=HTMLResponse)
+def passes_panel(request: Request, doc_id: str, conn: Conn) -> HTMLResponse:
+    """Show which passes ran over a document and what they found."""
+    need_document(conn, doc_id)
+    status = repo.pass_status(conn, doc_id)
+    rows = []
+    for row in repo.list_passes(conn, enabled_only=True):
+        counts = status.get(row["id"], {})
+        rows.append(
+            {
+                **row,
+                "done": bool(counts.get("done")),
+                "open": counts.get("open", 0),
+                "accepted": counts.get("accepted", 0),
+                "last_finished": counts.get("last_finished"),
+            }
+        )
+    return render(
+        request,
+        "partials/passes_panel.html",
+        {
+            "document_id": doc_id,
+            "groups": pass_groups(rows),
+            "pass_count": len(rows),
+            "run_count": sum(1 for row in rows if row["done"]),
+        },
+    )
 
 
 # Revisions

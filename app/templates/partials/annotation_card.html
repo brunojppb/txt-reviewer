@@ -1,40 +1,27 @@
-{% set next_status = "open" if a.status == "resolved" else "resolved" %}
+{% set is_finding = a.kind == "finding" %}
 <article
   id="annotation-{{ a.id }}"
-  class="annotation-card annotation-card--{{ a.kind }} absolute w-full rounded-lg border border-stone-200 bg-white p-3 text-sm shadow-sm{% if a.status == 'resolved' %} opacity-60{% endif %}"
+  class="annotation-card annotation-card--{{ a.kind }} absolute w-full rounded-lg border border-stone-200 bg-white p-3 text-sm shadow-sm"
   data-annotation-id="{{ a.id }}"
   data-kind="{{ a.kind }}"
   data-status="{{ a.status }}"
+  data-source="{{ a.source or 'manual' }}"
+  data-pass-id="{{ a.pass_id or '' }}"
+  data-pass-slug="{{ a.pass_slug or '' }}"
 >
   <header class="mb-2 flex items-center gap-2">
-    <span class="annotation-badge rounded-full bg-stone-100 px-2 py-0.5 text-xs font-medium capitalize">
-      {{ a.kind }}
+    <span class="annotation-badge truncate rounded-full bg-stone-100 px-2 py-0.5 text-xs font-medium{% if not is_finding %} capitalize{% endif %}">
+      {{ a.pass_title or "Finding" if is_finding else a.kind }}
     </span>
-    <time class="ml-auto text-xs text-stone-400">{{ a.created_at[:16] | replace("T", " ") }}</time>
-    {% if not readonly %}
-      <button
-        type="button"
-        class="rounded px-1.5 py-0.5 text-xs text-stone-500 hover:bg-stone-100"
-        hx-post="/annotations/{{ a.id }}/status"
-        hx-vals='{"status": "{{ next_status }}"}'
-        hx-target="closest article"
-        hx-swap="outerHTML"
-      >
-        {{ "Reopen" if a.status == "resolved" else "Resolve" }}
-      </button>
-      <button
-        type="button"
-        class="rounded px-1.5 py-0.5 text-xs text-stone-500 hover:bg-red-50 hover:text-red-700"
-        hx-delete="/annotations/{{ a.id }}"
-        hx-target="closest article"
-        hx-swap="delete"
-      >
-        Delete
-      </button>
-    {% endif %}
+    <time class="ml-auto shrink-0 text-xs text-stone-400">{{ a.created_at[:16] | replace("T", " ") }}</time>
   </header>
 
-  {% if readonly %}
+  {% if is_finding %}
+    {% if not a.anchored %}
+      <p class="mb-1 italic text-stone-500">“{{ a.quote }}”</p>
+    {% endif %}
+    <p class="whitespace-pre-wrap text-stone-700">{{ a.body }}</p>
+  {% elif readonly %}
     <p class="whitespace-pre-wrap text-stone-700">{{ a.body }}</p>
   {% else %}
     <textarea
@@ -47,5 +34,52 @@
       hx-target="closest article"
       hx-swap="outerHTML"
     >{{ a.body }}</textarea>
+  {% endif %}
+
+  {% if not readonly %}
+    <footer class="mt-2 flex items-center gap-2 text-xs">
+      {% if is_finding %}
+        <button
+          type="button"
+          class="rounded border border-stone-200 px-2 py-0.5 text-stone-600 hover:bg-emerald-50 hover:text-emerald-700"
+          hx-post="/annotations/{{ a.id }}/status"
+          hx-vals='{"status": "accepted"}'
+          hx-target="closest article"
+          hx-swap="delete"
+        >
+          Accept
+        </button>
+        <button
+          type="button"
+          class="rounded border border-stone-200 px-2 py-0.5 text-stone-600 hover:bg-stone-100"
+          hx-post="/annotations/{{ a.id }}/status"
+          hx-vals='{"status": "rejected"}'
+          hx-target="closest article"
+          hx-swap="delete"
+        >
+          Reject
+        </button>
+      {% else %}
+        <button
+          type="button"
+          class="rounded border border-stone-200 px-2 py-0.5 text-stone-600 hover:bg-emerald-50 hover:text-emerald-700"
+          hx-post="/annotations/{{ a.id }}/status"
+          hx-vals='{"status": "accepted"}'
+          hx-target="closest article"
+          hx-swap="delete"
+        >
+          Done
+        </button>
+        <button
+          type="button"
+          class="ml-auto rounded px-1.5 py-0.5 text-stone-500 hover:bg-red-50 hover:text-red-700"
+          hx-delete="/annotations/{{ a.id }}"
+          hx-target="closest article"
+          hx-swap="delete"
+        >
+          Delete
+        </button>
+      {% endif %}
+    </footer>
   {% endif %}
 </article>
