@@ -8,3 +8,5 @@ app/static/css/
 app/static/js/
 app/static/vendor/
 .playwright-mcp/
+
+.superpowers/
