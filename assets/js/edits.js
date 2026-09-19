@@ -133,6 +133,7 @@ async function accept(row) {
   const editId = row.dataset.editId
   if (!card || !annotationId || !editId) return
 
+  clearPreview()
   const range = findTarget(state.editor, annotationId, row.dataset.target)
   if (!range) {
     setDrifted(row, true)
@@ -176,6 +177,29 @@ function onClick(event) {
   if (row) accept(row)
 }
 
+/** Paints the words an edit row would change, inside the document. */
+function preview(row) {
+  const card = row.closest('.annotation-card')
+  const annotationId = card?.dataset.annotationId
+  if (!annotationId) return
+  const range = findTarget(state.editor, annotationId, row.dataset.target)
+  state.editor?.commands.setAnnotationState({ preview: range })
+}
+
+/** Clears the paint left by `preview`. */
+function clearPreview() {
+  state.editor?.commands.setAnnotationState({ preview: null })
+}
+
+function onOver(event) {
+  const row = event.target.closest?.('.annotation-edit')
+  if (row && !row.classList.contains('is-drifted')) preview(row)
+}
+
+function onOut(event) {
+  if (event.target.closest?.('.annotation-edit')) clearPreview()
+}
+
 /**
  * Wires the Accept button of every edit row in the sidebar.
  *
@@ -193,11 +217,19 @@ export function mountEdits({ editor }) {
   sidebar.addEventListener('click', onClick)
   // New cards arrive through htmx swaps and through the polling in changes.js.
   sidebar.addEventListener('htmx:afterSettle', refreshRows)
+  sidebar.addEventListener('mouseover', onOver)
+  sidebar.addEventListener('mouseout', onOut)
+  sidebar.addEventListener('focusin', onOver)
+  sidebar.addEventListener('focusout', onOut)
   refreshRows()
 
   return () => {
     sidebar.removeEventListener('click', onClick)
     sidebar.removeEventListener('htmx:afterSettle', refreshRows)
+    sidebar.removeEventListener('mouseover', onOver)
+    sidebar.removeEventListener('mouseout', onOut)
+    sidebar.removeEventListener('focusin', onOver)
+    sidebar.removeEventListener('focusout', onOut)
     state.editor = null
     state.sidebar = null
   }

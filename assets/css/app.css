@@ -215,6 +215,16 @@
     @apply bg-rose-200;
   }
 
+  /* The words an edit row would change, painted while the writer points. */
+  .is-preview {
+    @apply rounded-sm bg-emerald-200;
+    box-shadow: 0 0 0 2px var(--color-emerald-200, #a7f3d0);
+  }
+
+  .annotation-edit.is-drifted {
+    opacity: 0.45;
+  }
+
   /* ---- annotation cards ---- */
 
   #sidebar {
