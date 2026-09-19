@@ -2,6 +2,7 @@ import { createEditor } from './editor.js'
 import { mountSidebar, scheduleLayout } from './sidebar.js'
 import { mountPasses } from './passes.js'
 import { mountChanges } from './changes.js'
+import { mountEdits } from './edits.js'
 
 const SAVE_DELAY = 800
 
@@ -88,6 +89,7 @@ function boot() {
   updateWordCount(editor)
   mountPasses({ docId })
   mountSidebar({ editor, editorElement: editor.view.dom })
+  mountEdits({ editor })
   mountChanges({ editor, docId, readOnly })
   // Handy for debugging from the browser console.
   window.workshopEditor = editor
