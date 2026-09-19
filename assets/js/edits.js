@@ -111,12 +111,16 @@ function setFailed(row) {
  *
  * A finding that never anchored has no span to search, so all of its rows
  * dim. Undo can make a row findable again, so this restores as well. A row
- * whose request failed keeps that state here; only a fresh mount clears it.
+ * whose request failed gets its failed state repainted here, since a card
+ * swap can replace that row with a fresh one that knows nothing about it.
  */
 export function refreshRows() {
   if (!state.sidebar || !state.editor) return
   state.sidebar.querySelectorAll('.annotation-edit').forEach((row) => {
-    if (state.failed.has(row.dataset.editId)) return
+    if (state.failed.has(row.dataset.editId)) {
+      setFailed(row)
+      return
+    }
     const annotationId = row.closest('.annotation-card')?.dataset.annotationId
     const found = Boolean(findTarget(state.editor, annotationId, row.dataset.target))
     setDrifted(row, !found)
