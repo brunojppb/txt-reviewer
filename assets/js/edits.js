@@ -1,7 +1,7 @@
 import { findExact, findNormalized } from './quote-search.js'
 import { scheduleLayout } from './sidebar.js'
 
-const state = { editor: null, sidebar: null }
+const state = { editor: null, sidebar: null, failed: new Set() }
 
 /** Returns the span an annotation's mark covers, or null when it has none. */
 export function markRange(doc, id) {
@@ -74,9 +74,10 @@ export function applyEdit(editor, range, replacement) {
     view.dispatch(editorState.tr.delete(span.from, span.to))
     return true
   }
-  // The new words stay inside the highlight, so the finding keeps one span
-  // while its other edits wait.
-  const marks = doc.resolve(range.from + 1).marks()
+  // nodeAt reads the marks of the node that starts the span. resolve() at a
+  // one-character span lands on a node boundary, where the annotation
+  // mark's inclusive: false would drop it from the replacement.
+  const marks = doc.nodeAt(range.from)?.marks ?? []
   view.dispatch(
     editorState.tr.replaceWith(
       range.from,
@@ -96,15 +97,26 @@ function setDrifted(row, drifted) {
   button.textContent = drifted ? 'text changed' : 'Accept'
 }
 
+/** Marks a row whose apply request failed, so the writer can see the loss. */
+function setFailed(row) {
+  row.classList.add('is-failed')
+  const button = row.querySelector('.annotation-edit__accept')
+  if (!button) return
+  button.disabled = true
+  button.textContent = 'not saved'
+}
+
 /**
  * Dims every row whose words the editor can no longer find.
  *
  * A finding that never anchored has no span to search, so all of its rows
- * dim. Undo can make a row findable again, so this restores as well.
+ * dim. Undo can make a row findable again, so this restores as well. A row
+ * whose request failed keeps that state here; only a fresh mount clears it.
  */
 export function refreshRows() {
   if (!state.sidebar || !state.editor) return
   state.sidebar.querySelectorAll('.annotation-edit').forEach((row) => {
+    if (state.failed.has(row.dataset.editId)) return
     const annotationId = row.closest('.annotation-card')?.dataset.annotationId
     const found = Boolean(findTarget(state.editor, annotationId, row.dataset.target))
     setDrifted(row, !found)
@@ -136,8 +148,8 @@ async function accept(row) {
       card.outerHTML = html
       refreshRows()
     } else {
-      // No edit is left, so the server filed the finding and the mark goes.
-      state.editor?.commands.unsetAnnotationById(annotationId)
+      // No edit is left, so the server filed the finding. Removing the
+      // card fires this event, and sidebar.js drops the mark on it.
       card.remove()
       document.body.dispatchEvent(
         new CustomEvent('annotation:closed', { detail: { id: annotationId } }),
@@ -145,6 +157,10 @@ async function accept(row) {
     }
   } catch (error) {
     console.error('Could not record the edit', error)
+    // The text change stands: it is the writer's own, and autosave keeps it
+    // regardless. Only the row shows that the server never heard about it.
+    state.failed.add(editId)
+    setFailed(row)
   }
   scheduleLayout()
 }
@@ -169,6 +185,7 @@ export function mountEdits({ editor }) {
 
   state.editor = editor
   state.sidebar = sidebar
+  state.failed = new Set()
   sidebar.addEventListener('click', onClick)
   // New cards arrive through htmx swaps and through the polling in changes.js.
   sidebar.addEventListener('htmx:afterSettle', refreshRows)
@@ -177,5 +194,7 @@ export function mountEdits({ editor }) {
   return () => {
     sidebar.removeEventListener('click', onClick)
     sidebar.removeEventListener('htmx:afterSettle', refreshRows)
+    state.editor = null
+    state.sidebar = null
   }
 }
