@@ -109,7 +109,7 @@ def test_submit_findings_stores_open_findings(
     result = mcp_server.submit_findings(
         run["run_id"], [finding("very slow", 3), finding("for days", 2)]
     )
-    assert result == {"accepted": 2, "rejected": []}
+    assert result == {"accepted": 2, "rejected": [], "edits_dropped": []}
     assert repo.change_seq(conn, doc_id) > before
 
     findings = repo.list_findings(conn, doc_id)
@@ -233,3 +233,124 @@ def test_review_prompt_lists_every_enabled_pass(
     body = messages[1].content.text
     assert "cut-filler" in body
     assert "long-sentences" not in body
+
+
+# Edits
+
+
+def test_submit_findings_stores_edits(conn: sqlite3.Connection, run: dict) -> None:
+    result = mcp_server.submit_findings(
+        run["run_id"],
+        [
+            {
+                "quote": "the very slow waves",
+                "paragraph": 3,
+                "note": "An intensifier that adds nothing.",
+                "edits": [{"target": "very", "replacement": ""}],
+            }
+        ],
+    )
+
+    assert result["accepted"] == 1
+    assert result["edits_dropped"] == []
+    findings = repo.list_annotations(conn, run["document_id"])
+    assert [e["target"] for e in findings[0]["edits"]] == ["very"]
+    assert findings[0]["edits"][0]["replacement"] == ""
+
+
+def test_submit_findings_keeps_alternatives_in_order(
+    conn: sqlite3.Connection, run: dict
+) -> None:
+    mcp_server.submit_findings(
+        run["run_id"],
+        [
+            {
+                "quote": "the very slow waves",
+                "paragraph": 3,
+                "note": "An intensifier.",
+                "edits": [
+                    {"target": "very slow", "replacement": "sluggish"},
+                    {"target": "very slow", "replacement": "crawling"},
+                ],
+            }
+        ],
+    )
+
+    findings = repo.list_annotations(conn, run["document_id"])
+    assert [e["replacement"] for e in findings[0]["edits"]] == [
+        "sluggish",
+        "crawling",
+    ]
+
+
+def test_submit_findings_drops_a_target_outside_the_quote(
+    conn: sqlite3.Connection, run: dict
+) -> None:
+    result = mcp_server.submit_findings(
+        run["run_id"],
+        [
+            {
+                "quote": "the very slow waves",
+                "paragraph": 3,
+                "note": "An intensifier.",
+                "edits": [{"target": "keeper", "replacement": ""}],
+            }
+        ],
+    )
+
+    assert result["accepted"] == 1
+    assert result["edits_dropped"] == [
+        {"index": 0, "target": "keeper", "reason": "target not in quote"}
+    ]
+    findings = repo.list_annotations(conn, run["document_id"])
+    assert findings[0]["edits"] == []
+
+
+def test_submit_findings_drops_edits_of_a_quiet_pass(
+    conn: sqlite3.Connection, doc_id: str, fake_passes: list[dict]
+) -> None:
+    quiet = mcp_server.start_run(doc_id, "long-sentences", "pytest")
+
+    result = mcp_server.submit_findings(
+        quiet["run_id"],
+        [
+            {
+                "quote": "the very slow waves",
+                "paragraph": 3,
+                "note": "An intensifier.",
+                "edits": [{"target": "very", "replacement": ""}],
+            }
+        ],
+    )
+
+    assert result["accepted"] == 1
+    assert result["edits_dropped"] == [
+        {
+            "index": 0,
+            "target": "very",
+            "reason": "pass does not suggest wording",
+        }
+    ]
+
+
+def test_submit_findings_drops_a_long_replacement(
+    conn: sqlite3.Connection, run: dict
+) -> None:
+    result = mcp_server.submit_findings(
+        run["run_id"],
+        [
+            {
+                "quote": "the very slow waves",
+                "paragraph": 3,
+                "note": "An intensifier.",
+                "edits": [{"target": "very", "replacement": "x" * 121}],
+            }
+        ],
+    )
+
+    assert result["edits_dropped"][0]["reason"] == "replacement too long"
+
+
+def test_get_pass_reports_the_flag(fake_passes: list[dict]) -> None:
+    assert mcp_server.get_pass("cut-filler")["suggests_edits"] is True
+    assert mcp_server.get_pass("long-sentences")["suggests_edits"] is False
