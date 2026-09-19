@@ -57,6 +57,8 @@ framework.
 | `assets/js/sidebar.js` | card layout, active state, prev and next |
 | `assets/js/passes.js` | current pass, filter, panel |
 | `assets/js/changes.js` | polling and anchoring of new findings |
+| `assets/js/quote-search.js` | finds a quote in a block and maps the hit back |
+| `assets/js/edits.js` | edit rows: find the target, apply it, paint it |
 | `tests/` | pytest; `conftest.py` gives a temp database and fake passes |
 
 ## Rules that keep the system correct
@@ -76,9 +78,11 @@ plugin in `annotation-state.js`.
 One number per `listItem`. A `hardBreak` is a space. Empty blocks keep their
 number. Change both files together and update `tests/test_text.py`.
 
-**A finding never carries replacement wording.** The `submit_findings` schema
-has `quote`, `paragraph`, and `note`. Do not add a field for a fix. The coach
-text in `app/coach.py` states the same rule for the model.
+**Only a suggesting pass carries wording.** A pass with `suggests_edits = 1`
+may send edits on a finding. Every other pass sends the note alone, and
+`submit_findings` drops its edits. An edit has a `target` and a
+`replacement`, and an empty replacement means cut. The coach text in
+`app/coach.py` states the same rule for the model.
 
 **Schema changes are migrations.** `app/schema.sql` stays the version 1
 schema. Add a numbered step in `app/db.py` and a test in
@@ -88,6 +92,10 @@ the table and copy the rows.
 **Bump `change_seq`.** Any write to a document's annotations or runs must
 call the repo helper that increments `documents.change_seq`. The browser polls
 this value.
+
+**The browser applies an edit, then tells the server.** `edits.js` changes
+the text first and posts to the applied route second. A failed search posts
+nothing. The server never applies an edit to document content.
 
 ## MCP details
 
