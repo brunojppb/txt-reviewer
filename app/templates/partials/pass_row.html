@@ -49,6 +49,9 @@
         <label class="flex items-center gap-2 text-stone-600">
           <input type="checkbox" name="enabled" value="1" {{ "checked" if p.enabled }} /> Enabled
         </label>
+        <label class="flex items-center gap-2 text-stone-600">
+          <input type="checkbox" name="suggests_edits" value="1" {{ "checked" if p.suggests_edits }} /> Suggests wording
+        </label>
         <code class="text-stone-400">{{ p.slug }}</code>
         <button
           type="submit"

@@ -36,19 +36,48 @@
     >{{ a.body }}</textarea>
   {% endif %}
 
+  {% if is_finding and a.edits and not readonly %}
+    <div class="annotation-edits mt-2 border-t border-stone-100 pt-1">
+      {% for e in a.edits %}
+        <div
+          class="annotation-edit flex items-center gap-2 border-t border-stone-100 py-1 first:border-t-0"
+          data-edit-id="{{ e.id }}"
+          data-target="{{ e.target }}"
+          data-replacement="{{ e.replacement }}"
+        >
+          <span class="truncate text-stone-400 line-through">{{ e.target }}</span>
+          <span class="shrink-0 text-stone-300">→</span>
+          {% if e.replacement %}
+            <span class="truncate font-medium text-emerald-700">{{ e.replacement }}</span>
+          {% else %}
+            <span class="shrink-0 text-xs text-stone-400">cut</span>
+          {% endif %}
+          <button
+            type="button"
+            class="annotation-edit__accept ml-auto shrink-0 rounded border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 hover:bg-emerald-100"
+          >
+            Accept
+          </button>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+
   {% if not readonly %}
     <footer class="mt-2 flex items-center gap-2 text-xs">
       {% if is_finding %}
-        <button
-          type="button"
-          class="rounded border border-stone-200 px-2 py-0.5 text-stone-600 hover:bg-emerald-50 hover:text-emerald-700"
-          hx-post="/annotations/{{ a.id }}/status"
-          hx-vals='{"status": "accepted"}'
-          hx-target="closest article"
-          hx-swap="delete"
-        >
-          Accept
-        </button>
+        {% if not a.edits %}
+          <button
+            type="button"
+            class="rounded border border-stone-200 px-2 py-0.5 text-stone-600 hover:bg-emerald-50 hover:text-emerald-700"
+            hx-post="/annotations/{{ a.id }}/status"
+            hx-vals='{"status": "accepted"}'
+            hx-target="closest article"
+            hx-swap="delete"
+          >
+            Accept
+          </button>
+        {% endif %}
         <button
           type="button"
           class="rounded border border-stone-200 px-2 py-0.5 text-stone-600 hover:bg-stone-100"
