@@ -568,7 +568,7 @@ def update_pass(
     group_name: str,
     prompt: str,
     enabled: bool,
-    suggests_edits: bool = False,
+    suggests_edits: bool,
 ) -> dict[str, Any] | None:
     """Store the fields of a pass and return it."""
     with conn:

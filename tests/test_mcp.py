@@ -227,7 +227,7 @@ def test_review_prompt_lists_every_enabled_pass(
     conn: sqlite3.Connection, doc_id: str, fake_passes
 ) -> None:
     repo.update_pass(
-        conn, fake_passes[1]["id"], "Long sentences", "Sentences", "x", False
+        conn, fake_passes[1]["id"], "Long sentences", "Sentences", "x", False, False
     )
     messages = mcp_server.review(doc_id)
     body = messages[1].content.text
