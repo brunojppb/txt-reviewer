@@ -225,6 +225,13 @@
     opacity: 0.45;
   }
 
+  /* A failed save reads as a loss, not a stale target, so it tints rose. */
+  .annotation-edit.is-failed {
+    @apply bg-rose-50;
+    opacity: 0.6;
+    box-shadow: inset 0 0 0 1px var(--color-rose-200, #fecdd3);
+  }
+
   /* ---- annotation cards ---- */
 
   #sidebar {
