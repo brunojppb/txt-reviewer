@@ -1,20 +1,9 @@
 // Paragraph numbering mirrors app/text.py. A change here needs the same change
 // there, or the agent and the browser disagree about paragraph numbers.
 
-const LIST_TYPES = new Set(['bulletList', 'orderedList'])
+import { search } from './quote-search.js'
 
-const STRAIGHT_QUOTES = {
-  '‘': "'",
-  '’': "'",
-  '‚': "'",
-  '‛': "'",
-  '′': "'",
-  '“': '"',
-  '”': '"',
-  '„': '"',
-  '‟': '"',
-  '″': '"',
-}
+const LIST_TYPES = new Set(['bulletList', 'orderedList'])
 
 /** Text and text-offset-to-position map of one block. */
 function gather(node, nodePos) {
@@ -66,86 +55,6 @@ export function paragraphsOf(doc) {
   })
 
   return paragraphs
-}
-
-/** Collapses whitespace, straightens quotes, lowercases, and maps back. */
-function normalize(text) {
-  const out = []
-  const map = []
-  let lastWasSpace = false
-
-  for (let i = 0; i < text.length; i += 1) {
-    const char = text[i]
-    if (/\s/.test(char)) {
-      if (lastWasSpace) continue
-      lastWasSpace = true
-      out.push(' ')
-      map.push(i)
-      continue
-    }
-    lastWasSpace = false
-    const straight = STRAIGHT_QUOTES[char] || char
-    const lower = straight.toLowerCase()
-    out.push(lower.length === 1 ? lower : straight)
-    map.push(i)
-  }
-
-  return { text: out.join(''), map }
-}
-
-/** Turns a text range inside one paragraph into a document range. */
-function rangeOf(segments, start, end) {
-  let offset = 0
-  let from = null
-  let to = null
-
-  for (const segment of segments) {
-    const segmentStart = offset
-    const segmentEnd = offset + segment.text.length
-    if (from === null && start >= segmentStart && start < segmentEnd) {
-      from = segment.from + (start - segmentStart)
-    }
-    if (to === null && end > segmentStart && end <= segmentEnd) {
-      to = segment.from + (end - segmentStart)
-    }
-    offset = segmentEnd
-  }
-
-  return from !== null && to !== null && to > from ? { from, to } : null
-}
-
-function findExact(paragraph, quote) {
-  const index = paragraph.text.indexOf(quote)
-  if (index < 0) return null
-  return rangeOf(paragraph.segments, index, index + quote.length)
-}
-
-function findNormalized(paragraph, quote) {
-  const needle = normalize(quote).text.trim()
-  if (!needle) return null
-
-  const hay = normalize(paragraph.text)
-  const index = hay.text.indexOf(needle)
-  if (index < 0) return null
-
-  const start = hay.map[index]
-  const end = hay.map[index + needle.length - 1] + 1
-  return rangeOf(paragraph.segments, start, end)
-}
-
-function search(paragraphs, named, quote) {
-  const order = [
-    () => (named ? findExact(named, quote) : null),
-    () => (named ? findNormalized(named, quote) : null),
-    () => paragraphs.reduce((hit, p) => hit || findExact(p, quote), null),
-    () => paragraphs.reduce((hit, p) => hit || findNormalized(p, quote), null),
-  ]
-
-  for (const attempt of order) {
-    const hit = attempt()
-    if (hit) return hit
-  }
-  return null
 }
 
 /** True when the document already carries a mark with this annotation id. */

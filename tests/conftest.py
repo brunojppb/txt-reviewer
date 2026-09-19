@@ -21,6 +21,7 @@ FAKE_PASSES = [
         "title": "Cut filler",
         "group": "Writing cleanup",
         "prompt": "Find words that carry no meaning.",
+        "suggests_edits": True,
     },
     {
         "slug": "long-sentences",

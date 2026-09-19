@@ -10,7 +10,7 @@ from pathlib import Path
 
 SCHEMA_PATH = Path(__file__).with_name("schema.sql")
 DEFAULT_DB_PATH = "data/app.db"
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 logger = logging.getLogger(__name__)
 
@@ -78,6 +78,55 @@ ALTER TABLE documents ADD COLUMN change_seq INTEGER NOT NULL DEFAULT 0;
 COMMIT;
 """
 
+# The passes whose findings may carry wording. Each one maps a span of text to
+# a cut or to one plain equivalent.
+SUGGESTING_SLUGS = (
+    "sand-off-filler-words",
+    "cut-hedges-and-intensifiers",
+    "cut-redundant-pairs",
+    "cut-redundant-modifiers",
+    "cut-redundant-categories",
+    "replace-phrases-with-words",
+    "turn-negatives-into-affirmatives",
+    "trim-metadiscourse",
+    "delete-empty-verbs",
+)
+
+
+def _sql_slug_list(slugs: tuple[str, ...]) -> str:
+    """Return the slugs as a quoted, comma-joined SQL literal list."""
+    return ",\n  ".join("'" + slug.replace("'", "''") + "'" for slug in slugs)
+
+
+# Version 3 lets a finding carry wording. No CHECK constraint on an existing
+# table changes, so SQLite needs no copy of a table here. The slug list comes
+# from SUGGESTING_SLUGS so the two cannot drift apart.
+MIGRATION_3 = f"""
+BEGIN;
+
+ALTER TABLE passes ADD COLUMN suggests_edits INTEGER NOT NULL DEFAULT 0;
+
+CREATE TABLE finding_edits (
+  id TEXT PRIMARY KEY,
+  annotation_id TEXT NOT NULL REFERENCES annotations(id) ON DELETE CASCADE,
+  position INTEGER NOT NULL,
+  target TEXT NOT NULL,
+  replacement TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open','applied')),
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE INDEX idx_finding_edits_annotation
+  ON finding_edits(annotation_id, position);
+
+UPDATE passes SET suggests_edits = 1 WHERE slug IN (
+  {_sql_slug_list(SUGGESTING_SLUGS)}
+);
+
+COMMIT;
+"""
+
 
 def db_path() -> Path:
     """Return the database path from the WORKSHOP_DB environment variable."""
@@ -116,6 +165,9 @@ def migrate(conn: sqlite3.Connection) -> None:
         if version < 2:
             conn.executescript(MIGRATION_2)
             conn.execute("PRAGMA user_version = 2")
+        if version < 3:
+            conn.executescript(MIGRATION_3)
+            conn.execute("PRAGMA user_version = 3")
     finally:
         conn.execute("PRAGMA foreign_keys = ON")
 

@@ -7,7 +7,7 @@ them directly.
 from __future__ import annotations
 
 import sqlite3
-from typing import Any, TypedDict
+from typing import Any, NotRequired, TypedDict
 
 from mcp.server.mcpserver import MCPServer, Message, UserMessage
 from mcp.server.mcpserver.exceptions import ToolError
@@ -18,16 +18,25 @@ from app.db import db_path, get_conn
 
 QUOTE_MAX = 300
 NOTE_MAX = 600
+REPLACEMENT_MAX = 120
 
 server = MCPServer("workshop", instructions=COACH)
 
 
+class Edit(TypedDict):
+    """One change a finding offers. An empty replacement means cut."""
+
+    target: str
+    replacement: str
+
+
 class Finding(TypedDict):
-    """One problem in the text: the quote, its paragraph, and the note."""
+    """One problem in the text: the quote, its paragraph, the note, the edits."""
 
     quote: str
     paragraph: int
     note: str
+    edits: NotRequired[list[Edit]]
 
 
 def connect() -> sqlite3.Connection:
@@ -93,6 +102,7 @@ def _pass_view(row: dict[str, Any]) -> dict[str, Any]:
         "title": row["title"],
         "group": row["group_name"],
         "enabled": bool(row["enabled"]),
+        "suggests_edits": bool(row["suggests_edits"]),
     }
 
 
@@ -176,17 +186,34 @@ def start_run(document: str, pass_ref: str, agent: str = "") -> dict[str, Any]:
         conn.close()
 
 
+def _edit_reason(edit: Any, quote: str, suggests: bool) -> str | None:
+    """Return why this edit cannot stand, or None when it can."""
+    if not suggests:
+        return "pass does not suggest wording"
+    target = str(edit.get("target", "")).strip()
+    if not 1 <= len(target) <= QUOTE_MAX:
+        return "target too long"
+    if len(str(edit.get("replacement", "")).strip()) > REPLACEMENT_MAX:
+        return "replacement too long"
+    if not _holds(quote, target):
+        return "target not in quote"
+    return None
+
+
 @server.tool()
 def submit_findings(run_id: str, findings: list[Finding]) -> dict[str, Any]:
-    """Submit every finding of a run in one call. A finding names a problem only."""
+    """Submit every finding of a run in one call. A finding may carry edits."""
     conn = connect()
     try:
         run = _need_run(conn, run_id)
         doc = _need_document(conn, run["document_id"])
         paras = text.paragraphs(doc["content"])
+        found_pass = repo.get_pass(conn, run["pass_id"])
+        suggests = bool(found_pass and found_pass["suggests_edits"])
 
         accepted = 0
         rejected: list[dict[str, Any]] = []
+        edits_dropped: list[dict[str, Any]] = []
         for index, finding in enumerate(findings):
             quote = str(finding.get("quote", "")).strip()
             note = str(finding.get("note", "")).strip()
@@ -216,15 +243,40 @@ def submit_findings(run_id: str, findings: list[Finding]) -> dict[str, Any]:
                 rejected.append({"index": index, "reason": "quote not found"})
                 continue
 
-            repo.create_finding(
+            created = repo.create_finding(
                 conn, doc["id"], run["pass_id"], run["id"], quote, number, note
             )
             accepted += 1
 
+            position = 0
+            for edit in finding.get("edits") or []:
+                reason = _edit_reason(edit, quote, suggests)
+                if reason is not None:
+                    edits_dropped.append(
+                        {
+                            "index": index,
+                            "target": str(edit.get("target", "")).strip(),
+                            "reason": reason,
+                        }
+                    )
+                    continue
+                repo.create_edit(
+                    conn,
+                    created["id"],
+                    position,
+                    str(edit.get("target", "")).strip(),
+                    str(edit.get("replacement", "")).strip(),
+                )
+                position += 1
+
         if accepted:
             repo.add_findings_to_run(conn, run["id"], accepted)
         repo.bump_change_seq(conn, doc["id"])
-        return {"accepted": accepted, "rejected": rejected}
+        return {
+            "accepted": accepted,
+            "rejected": rejected,
+            "edits_dropped": edits_dropped,
+        }
     finally:
         conn.close()
 

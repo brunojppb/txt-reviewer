@@ -14,6 +14,7 @@ PASSES: list[dict] = [
         "slug": "sand-off-filler-words",
         "title": "Sand off filler words",
         "group": "Writing cleanup",
+        "suggests_edits": True,
         "prompt": (
             "Look for filler words that add no meaning. Words like very, really, "
             "actually, basically, simply, just, quite, and rather count as "
@@ -24,13 +25,16 @@ PASSES: list[dict] = [
             "filler inside a direct quotation from a source. Report at most the "
             "15 most important instances. Quote the exact words from the text, "
             "verbatim and short. In the note, name the problem and say what it "
-            "costs the reader. Never propose new wording."
+            "costs the reader. Send the words to cut as an edit on the finding, "
+            "with an empty replacement. The target must be the exact words from "
+            "the text."
         ),
     },
     {
         "slug": "cut-hedges-and-intensifiers",
         "title": "Cut hedges and intensifiers",
         "group": "Writing cleanup",
+        "suggests_edits": True,
         "prompt": (
             "Look for hedges and intensifiers that blur a claim. Hedges include "
             "somewhat, perhaps, tends to, in some sense, and it seems. "
@@ -41,13 +45,16 @@ PASSES: list[dict] = [
             "evidence. Do not flag an intensifier that marks a true extreme. "
             "Report at most the 15 most important instances. Quote the exact "
             "words from the text, verbatim and short. In the note, name the "
-            "problem and say what it costs the reader. Never propose new wording."
+            "problem and say what it costs the reader. Send the words to cut "
+            "as an edit on the finding, with an empty replacement. The target "
+            "must be the exact words from the text."
         ),
     },
     {
         "slug": "cut-redundant-pairs",
         "title": "Cut redundant word pairs",
         "group": "Writing cleanup",
+        "suggests_edits": True,
         "prompt": (
             "Look for paired words that mean the same thing. Each and every, "
             "first and foremost, hopes and dreams, full and complete, and any "
@@ -58,13 +65,16 @@ PASSES: list[dict] = [
             "writer repeats for a stated rhythm in a deliberate list. Report at "
             "most the 15 most important instances. Quote the exact words from the "
             "text, verbatim and short. In the note, name the problem and say what "
-            "it costs the reader. Never propose new wording."
+            "it costs the reader. Send the words to cut as an edit on the "
+            "finding, with an empty replacement. The target must be the exact "
+            "words from the text."
         ),
     },
     {
         "slug": "cut-redundant-modifiers",
         "title": "Cut redundant modifiers",
         "group": "Writing cleanup",
+        "suggests_edits": True,
         "prompt": (
             "Look for modifiers already contained in the word they modify. Past "
             "history, final outcome, future plans, advance warning, basic "
@@ -75,13 +85,16 @@ PASSES: list[dict] = [
             "timing matters. Do not flag a fixed term from a field or a product "
             "name. Report at most the 15 most important instances. Quote the "
             "exact words from the text, verbatim and short. In the note, name the "
-            "problem and say what it costs the reader. Never propose new wording."
+            "problem and say what it costs the reader. Send the words to cut as "
+            "an edit on the finding, with an empty replacement. The target must "
+            "be the exact words from the text."
         ),
     },
     {
         "slug": "cut-redundant-categories",
         "title": "Cut redundant category words",
         "group": "Writing cleanup",
+        "suggests_edits": True,
         "prompt": (
             "Look for a word that names the category a nearby word already "
             "belongs to. A period of time, an area of research, in a state of "
@@ -92,13 +105,16 @@ PASSES: list[dict] = [
             "defined term in a technical document. Report at most the 15 most "
             "important instances. Quote the exact words from the text, verbatim "
             "and short. In the note, name the problem and say what it costs the "
-            "reader. Never propose new wording."
+            "reader. Send the words to cut as an edit on the finding, with an "
+            "empty replacement. The target must be the exact words from the "
+            "text."
         ),
     },
     {
         "slug": "replace-phrases-with-words",
         "title": "Replace phrases with single words",
         "group": "Writing cleanup",
+        "suggests_edits": True,
         "prompt": (
             "Look for a multi-word phrase that one plain word covers. In order "
             "to, due to the fact that, for the purpose of, in the event that, at "
@@ -109,13 +125,16 @@ PASSES: list[dict] = [
             "fixed phrase from law, a standard, or an interface label. Report at "
             "most the 15 most important instances. Quote the exact words from the "
             "text, verbatim and short. In the note, name the problem and say what "
-            "it costs the reader. Never propose new wording."
+            "it costs the reader. Send the plain equivalent as an edit on the "
+            "finding. The target must be the exact words from the text, and the "
+            "replacement must be the shortest wording that keeps the meaning."
         ),
     },
     {
         "slug": "turn-negatives-into-affirmatives",
         "title": "Turn negatives into affirmatives",
         "group": "Writing cleanup",
+        "suggests_edits": True,
         "prompt": (
             "Look for a negative that hides a plain claim. Not unlike, not "
             "uncommon, did not remember, does not have many, and not without merit "
@@ -126,13 +145,16 @@ PASSES: list[dict] = [
             "that marks a contrast with a claim made just before. Report at most "
             "the 15 most important instances. Quote the exact words from the "
             "text, verbatim and short. In the note, name the problem and say what "
-            "it costs the reader. Never propose new wording."
+            "it costs the reader. Send the plain equivalent as an edit on the "
+            "finding. The target must be the exact words from the text, and the "
+            "replacement must be the shortest wording that keeps the meaning."
         ),
     },
     {
         "slug": "trim-metadiscourse",
         "title": "Trim talk about the writing",
         "group": "Writing cleanup",
+        "suggests_edits": True,
         "prompt": (
             "Look for sentences and clauses about the writing rather than the "
             "subject. I think that, it should be noted that, in this section I "
@@ -143,7 +165,9 @@ PASSES: list[dict] = [
             "that marks who holds an opinion when the source matters. Report at "
             "most the 15 most important instances. Quote the exact words from the "
             "text, verbatim and short. In the note, name the problem and say what "
-            "it costs the reader. Never propose new wording."
+            "it costs the reader. Send the words to cut as an edit on the "
+            "finding, with an empty replacement. The target must be the exact "
+            "words from the text."
         ),
     },
     # --- Clarity ---
@@ -185,6 +209,7 @@ PASSES: list[dict] = [
         "slug": "delete-empty-verbs",
         "title": "Delete empty verbs",
         "group": "Clarity",
+        "suggests_edits": True,
         "prompt": (
             "Look for verbs that carry no action. Is, has, make, do, perform, "
             "conduct, provide, and undertake count as instances when the real "
@@ -195,7 +220,10 @@ PASSES: list[dict] = [
             "possession. Do not flag a verb that is the only action available. "
             "Report at most the 15 most important instances. Quote the exact words "
             "from the text, verbatim and short. In the note, name the problem and "
-            "say what it costs the reader. Never propose new wording."
+            "say what it costs the reader. Send the plain equivalent as an edit "
+            "on the finding. The target must be the exact words from the text, "
+            "and the replacement must be the shortest wording that keeps the "
+            "meaning."
         ),
     },
     {

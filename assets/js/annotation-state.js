@@ -7,7 +7,7 @@ export const annotationStateKey = new PluginKey('annotationState')
 // ProseMirror redraws marks whose DOM changes behind its back, so active,
 // resolved and dimmed styling goes through decorations instead of class
 // toggles.
-function buildDecorations(doc, { activeId, resolved, dimPass }) {
+function buildDecorations(doc, { activeId, resolved, dimPass, preview }) {
   const decorations = []
   doc.descendants((node, pos) => {
     if (!node.isText) return
@@ -25,15 +25,20 @@ function buildDecorations(doc, { activeId, resolved, dimPass }) {
       }
     })
   })
+  if (preview && preview.to > preview.from) {
+    decorations.push(Decoration.inline(preview.from, preview.to, { class: 'is-preview' }))
+  }
   return DecorationSet.create(doc, decorations)
 }
 
 /**
- * Paints the active, resolved and dimmed annotation states over the marks.
+ * Paints the active, resolved, dimmed and preview annotation states over the
+ * marks.
  *
- * Command: `setAnnotationState({ activeId, resolved, dimPass })` where
- * `resolved` is an iterable of annotation ids and `dimPass` is a pass slug or
- * null. Omitted fields keep their value.
+ * Command: `setAnnotationState({ activeId, resolved, dimPass, preview })`
+ * where `resolved` is an iterable of annotation ids, `dimPass` is a pass slug
+ * or null, and `preview` is a `{from, to}` document range or null. Omitted
+ * fields keep their value.
  */
 export const AnnotationState = Extension.create({
   name: 'annotationState',
@@ -58,6 +63,7 @@ export const AnnotationState = Extension.create({
             activeId: null,
             resolved: new Set(),
             dimPass: null,
+            preview: null,
             decorations: DecorationSet.empty,
           }),
           apply(tr, prev, _oldState, newState) {
@@ -66,11 +72,23 @@ export const AnnotationState = Extension.create({
             const activeId = meta && 'activeId' in meta ? meta.activeId : prev.activeId
             const resolved = meta && 'resolved' in meta ? new Set(meta.resolved) : prev.resolved
             const dimPass = meta && 'dimPass' in meta ? meta.dimPass || null : prev.dimPass
+            // Positions move when the text moves, so a stale preview must go.
+            const preview = tr.docChanged
+              ? null
+              : meta && 'preview' in meta
+                ? meta.preview || null
+                : prev.preview
             return {
               activeId,
               resolved,
               dimPass,
-              decorations: buildDecorations(newState.doc, { activeId, resolved, dimPass }),
+              preview,
+              decorations: buildDecorations(newState.doc, {
+                activeId,
+                resolved,
+                dimPass,
+                preview,
+              }),
             }
           },
         },

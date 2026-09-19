@@ -132,7 +132,7 @@ def list_annotations(
         " ORDER BY a.created_at, a.id",
         (doc_id,),
     ).fetchall()
-    return _rows(rows)
+    return _attach_edits(conn, _rows(rows))
 
 
 def get_annotation(conn: sqlite3.Connection, aid: str) -> dict[str, Any] | None:
@@ -142,7 +142,10 @@ def get_annotation(conn: sqlite3.Connection, aid: str) -> dict[str, Any] | None:
         " LEFT JOIN passes p ON p.id = a.pass_id WHERE a.id = ?",
         (aid,),
     ).fetchone()
-    return _row(row)
+    annotation = _row(row)
+    if annotation is None:
+        return None
+    return _attach_edits(conn, [annotation])[0]
 
 
 def create_annotation(
@@ -362,6 +365,93 @@ def list_findings(
     return _rows(rows)
 
 
+# Edits
+
+
+def _attach_edits(
+    conn: sqlite3.Connection, annotations: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    """Put each annotation's open edits on it, in position order."""
+    for annotation in annotations:
+        annotation["edits"] = []
+    ids = [a["id"] for a in annotations]
+    if not ids:
+        return annotations
+    marks = ",".join("?" for _ in ids)
+    rows = conn.execute(
+        f"SELECT * FROM finding_edits WHERE annotation_id IN ({marks})"
+        " AND status = 'open' ORDER BY position, created_at",
+        ids,
+    ).fetchall()
+    by_id = {a["id"]: a for a in annotations}
+    for row in rows:
+        by_id[row["annotation_id"]]["edits"].append(dict(row))
+    return annotations
+
+
+def create_edit(
+    conn: sqlite3.Connection,
+    annotation_id: str,
+    position: int,
+    target: str,
+    replacement: str,
+) -> dict[str, Any] | None:
+    """Insert one edit of a finding and return it."""
+    eid = new_id()
+    ts = now_iso()
+    with conn:
+        conn.execute(
+            "INSERT INTO finding_edits (id, annotation_id, position, target,"
+            " replacement, status, created_at, updated_at)"
+            " VALUES (?, ?, ?, ?, ?, 'open', ?, ?)",
+            (eid, annotation_id, position, target, replacement, ts, ts),
+        )
+    return get_edit(conn, eid)
+
+
+def get_edit(conn: sqlite3.Connection, eid: str) -> dict[str, Any] | None:
+    """Return one edit, or None when the id is unknown."""
+    row = conn.execute("SELECT * FROM finding_edits WHERE id = ?", (eid,)).fetchone()
+    return _row(row)
+
+
+def list_edits(
+    conn: sqlite3.Connection, annotation_id: str, open_only: bool = True
+) -> list[dict[str, Any]]:
+    """Return the edits of a finding in position order."""
+    where = "annotation_id = ?"
+    if open_only:
+        where += " AND status = 'open'"
+    rows = conn.execute(
+        f"SELECT * FROM finding_edits WHERE {where} ORDER BY position, created_at",
+        (annotation_id,),
+    ).fetchall()
+    return _rows(rows)
+
+
+def apply_edit(conn: sqlite3.Connection, eid: str) -> dict[str, Any] | None:
+    """Mark one edit applied and return it."""
+    with conn:
+        cur = conn.execute(
+            "UPDATE finding_edits SET status = 'applied', updated_at = ?"
+            " WHERE id = ? AND status = 'open'",
+            (now_iso(), eid),
+        )
+    if cur.rowcount == 0:
+        return None
+    return get_edit(conn, eid)
+
+
+def count_open_edits(conn: sqlite3.Connection, annotation_id: str) -> int:
+    """Return how many edits of a finding still wait for the writer."""
+    row = conn.execute(
+        "SELECT COUNT(*) AS n FROM finding_edits"
+        " WHERE annotation_id = ? AND status = 'open'",
+        (annotation_id,),
+    ).fetchone()
+    return int(row["n"])
+
+
 # Passes
 
 
@@ -425,8 +515,8 @@ def insert_passes(conn: sqlite3.Connection, entries: list[dict[str, Any]]) -> in
             slug = str(entry.get("slug") or slugify(str(entry.get("title", ""))))
             conn.execute(
                 "INSERT OR IGNORE INTO passes (id, position, slug, title, group_name,"
-                " prompt, enabled, created_at, updated_at)"
-                " VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)",
+                " prompt, enabled, suggests_edits, created_at, updated_at)"
+                " VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?)",
                 (
                     new_id(),
                     position,
@@ -434,6 +524,7 @@ def insert_passes(conn: sqlite3.Connection, entries: list[dict[str, Any]]) -> in
                     str(entry.get("title", slug)),
                     str(entry.get("group", "")),
                     str(entry.get("prompt", "")),
+                    1 if entry.get("suggests_edits") else 0,
                     ts,
                     ts,
                 ),
@@ -477,17 +568,19 @@ def update_pass(
     group_name: str,
     prompt: str,
     enabled: bool,
+    suggests_edits: bool,
 ) -> dict[str, Any] | None:
     """Store the fields of a pass and return it."""
     with conn:
         cur = conn.execute(
             "UPDATE passes SET title = ?, group_name = ?, prompt = ?, enabled = ?,"
-            " updated_at = ? WHERE id = ?",
+            " suggests_edits = ?, updated_at = ? WHERE id = ?",
             (
                 title or "Untitled pass",
                 group_name,
                 prompt,
                 1 if enabled else 0,
+                1 if suggests_edits else 0,
                 now_iso(),
                 pid,
             ),

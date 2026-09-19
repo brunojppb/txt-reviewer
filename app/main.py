@@ -360,6 +360,28 @@ def set_annotation_status(
     return card(request, annotation)
 
 
+@app.post("/annotations/{aid}/edits/{eid}/applied")
+def set_edit_applied(
+    request: Request,
+    aid: str,
+    eid: str,
+    conn: Conn,
+) -> Response:
+    """Record that the browser applied one edit of a finding."""
+    annotation = need_annotation(conn, aid)
+    edit = repo.get_edit(conn, eid)
+    if edit is None or edit["annotation_id"] != aid:
+        raise HTTPException(status_code=404, detail="edit not found")
+    if repo.apply_edit(conn, eid) is None:
+        raise HTTPException(status_code=409, detail="edit is not open")
+
+    repo.bump_change_seq(conn, annotation["document_id"])
+    if repo.count_open_edits(conn, aid) == 0:
+        repo.set_annotation_status(conn, aid, "accepted")
+        return hx_trigger("annotation:closed", {"id": aid})
+    return card(request, repo.get_annotation(conn, aid))
+
+
 @app.post("/annotations/{aid}/anchored")
 def set_annotation_anchored(
     aid: str,
@@ -422,6 +444,7 @@ def update_pass(
     group_name: Annotated[str, Form()] = "",
     prompt: Annotated[str, Form()] = "",
     enabled: Annotated[str | None, Form()] = None,
+    suggests_edits: Annotated[str | None, Form()] = None,
 ) -> HTMLResponse:
     """Store the fields of one pass."""
     need_pass(conn, pid)
@@ -432,6 +455,7 @@ def update_pass(
         group_name.strip(),
         prompt.strip(),
         enabled not in (None, "", "0", "false", "off"),
+        suggests_edits not in (None, "", "0", "false", "off"),
     )
     if row is None:
         raise HTTPException(status_code=404, detail="pass not found")
