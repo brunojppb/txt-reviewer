@@ -92,9 +92,16 @@ SUGGESTING_SLUGS = (
     "delete-empty-verbs",
 )
 
+
+def _sql_slug_list(slugs: tuple[str, ...]) -> str:
+    """Return the slugs as a quoted, comma-joined SQL literal list."""
+    return ",\n  ".join("'" + slug.replace("'", "''") + "'" for slug in slugs)
+
+
 # Version 3 lets a finding carry wording. No CHECK constraint on an existing
-# table changes, so SQLite needs no copy of a table here.
-MIGRATION_3 = """
+# table changes, so SQLite needs no copy of a table here. The slug list comes
+# from SUGGESTING_SLUGS so the two cannot drift apart.
+MIGRATION_3 = f"""
 BEGIN;
 
 ALTER TABLE passes ADD COLUMN suggests_edits INTEGER NOT NULL DEFAULT 0;
@@ -114,15 +121,7 @@ CREATE INDEX idx_finding_edits_annotation
   ON finding_edits(annotation_id, position);
 
 UPDATE passes SET suggests_edits = 1 WHERE slug IN (
-  'sand-off-filler-words',
-  'cut-hedges-and-intensifiers',
-  'cut-redundant-pairs',
-  'cut-redundant-modifiers',
-  'cut-redundant-categories',
-  'replace-phrases-with-words',
-  'turn-negatives-into-affirmatives',
-  'trim-metadiscourse',
-  'delete-empty-verbs'
+  {_sql_slug_list(SUGGESTING_SLUGS)}
 );
 
 COMMIT;
